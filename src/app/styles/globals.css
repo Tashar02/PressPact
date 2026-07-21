@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --color-press-green: #2e7d46;
+    --color-press-green-dark: #1e5830;
+    --color-press-green-light: #4caf50;
+    --color-press-bg: #f1fcf1;
+  }
+  
+  body {
+    background-color: #f1fcf1;
+    color: #14532d;
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+/* Custom UI Scrollbars & Glassmorphism */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(46, 125, 70, 0.05);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(46, 125, 70, 0.2);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(46, 125, 70, 0.4);
+}
