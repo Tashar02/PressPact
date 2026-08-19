@@ -258,13 +258,15 @@ export const jobService = {
   async generateInvoice(
     jobId: string,
     invoiceId: string,
-    amountBdt: number
+    amountBdt: number,
+    invoiceDueDate: string
   ): Promise<void> {
     const { error } = await supabase
       .from("job_orders")
       .update({
         invoice_id: invoiceId,
         amount_bdt: amountBdt,
+        invoice_due_date: invoiceDueDate,
         payment_status: "Unpaid",
         status: "Invoiced",
       })
