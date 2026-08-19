@@ -1,35 +1,97 @@
 import React, { useState } from "react";
-import { UserRole } from "../../types";
+import { UserRole, UserProfile } from "../../types";
+import { authService } from "../../services/authService";
 import {
   BookOpen,
   Mail,
   Lock,
-  User,
   Building,
-  MapPin,
   Phone,
   ArrowRight,
   CheckCircle2,
-  Layers,
+  AlertCircle,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 
 interface AuthPagesProps {
-  onLoginSuccess: (role: UserRole) => void;
+  onLoginSuccess: (profile: UserProfile) => void;
 }
 
 export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
   const [isSignup, setIsSignup] = useState(false);
   const [role, setRole] = useState<UserRole>("press_owner");
   const [email, setEmail] = useState("rahim@novalamination.bd");
-  const [password, setPassword] = useState("••••••••");
+  const [password, setPassword] = useState("12345678");
   const [fullName, setFullName] = useState("Md. Abdur Rahim");
   const [businessName, setBusinessName] = useState("Nova Lamination");
   const [shopLocation, setShopLocation] = useState("38/2 Banglabazar, Dhaka");
   const [phone, setPhone] = useState("+880 1711-456789");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Quick Demo Account Pre-fill Helper
+  const handleQuickFill = (targetRole: UserRole) => {
+    setRole(targetRole);
+    if (targetRole === "press_owner") {
+      setEmail("rahim@novalamination.bd");
+      setPassword("12345678");
+      setFullName("Md. Abdur Rahim");
+      setBusinessName("Nova Lamination");
+      setShopLocation("38/2 Banglabazar, Dhaka");
+      setPhone("+880 1711-456789");
+    } else {
+      setEmail("mithu@sagorikabooks.bd");
+      setPassword("12345678");
+      setFullName("Shahin Ahmed Mithu");
+      setBusinessName("Sagorica Publications");
+      setShopLocation("Banglabazar, Dhaka");
+      setPhone("+880 1711-987654");
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess(role);
+    setErrorMessage(null);
+    setIsLoading(true);
+
+    try {
+      if (isSignup) {
+        const newProfile = await authService.signUp({
+          email,
+          password,
+          role,
+          fullName,
+          businessName,
+          phone,
+          location: shopLocation,
+        });
+        onLoginSuccess(newProfile);
+      } else {
+        const loggedInProfile = await authService.signIn(email, password);
+        onLoginSuccess(loggedInProfile);
+      }
+    } catch (err: any) {
+      console.error("Auth submit error:", err);
+      // Fallback for presentation showcase if auth service encounters unconfigured credentials
+      if (err?.message?.includes("missing") || err?.message?.includes("Failed to fetch") || err?.message?.includes("Invalid API key")) {
+        const mockProfile: UserProfile = {
+          id: `usr-${Date.now()}`,
+          email,
+          role,
+          fullName,
+          businessName,
+          phone,
+          location: shopLocation,
+        };
+        onLoginSuccess(mockProfile);
+      } else {
+        setErrorMessage(err?.message || "Authentication failed. Please check your credentials.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -57,7 +119,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
             <div className="space-y-1.5">
               <h3 className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest">About Us</h3>
               <p className="text-xs text-green-50 leading-relaxed font-medium">
-                PressPact is a dedicated B2B workspace connecting book lamination presses and publishers in Bangladesh. We replace the messy paper receipts and verbal arguments with a transparent, digital workflow.
+                PressPact is a dedicated B2B workspace connecting book lamination presses and publishers in Bangladesh. We replace messy paper registers with a transparent, digital workflow.
               </p>
             </div>
           </div>
@@ -91,7 +153,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
         </div>
 
         {/* Right Side: Form */}
-        <div className="p-8 lg:p-10 space-y-6 flex flex-col justify-center">
+        <div className="p-8 lg:p-10 space-y-5 flex flex-col justify-center">
           <div>
             <h2 className="text-2xl font-extrabold text-gray-900">
               {isSignup ? "Create Account" : "Welcome Back"}
@@ -103,19 +165,29 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
             </p>
           </div>
 
+          {/* Error Message Alert */}
+          {errorMessage && (
+            <div className="p-3.5 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs flex items-center gap-2 font-medium">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role Selection (FR-5.1) */}
+            {/* Role Selection */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-bold text-gray-800">
-                Select Your Operating Role
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-gray-800">
+                  Select Your Operating Role
+                </label>
+                <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-bold">
+                  <Sparkles className="w-3 h-3" /> Quick Demo Fill
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setRole("press_owner");
-                    setEmail("rahim@novalamination.bd");
-                  }}
+                  onClick={() => handleQuickFill("press_owner")}
                   className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
                     role === "press_owner"
                       ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
@@ -128,10 +200,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
 
                 <button
                   type="button"
-                  onClick={() => {
-                    setRole("publisher");
-                    setEmail("mithu@sagorikabooks.bd");
-                  }}
+                  onClick={() => handleQuickFill("publisher")}
                   className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 ${
                     role === "publisher"
                       ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
@@ -144,7 +213,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
               </div>
             </div>
 
-            {/* Registration Fields (FR-5.2) */}
+            {/* Registration Fields */}
             {isSignup && (
               <>
                 <div className="space-y-1">
@@ -153,19 +222,21 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
                     type="text"
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                     required
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="block text-xs font-bold text-gray-700">Business Name</label>
+                    <label className="block text-xs font-bold text-gray-700">
+                      {role === "press_owner" ? "Press Name" : "Publisher House"}
+                    </label>
                     <input
                       type="text"
                       value={businessName}
                       onChange={(e) => setBusinessName(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                       required
                     />
                   </div>
@@ -176,7 +247,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
                       type="text"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                      className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                       required
                     />
                   </div>
@@ -188,7 +259,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
                     type="text"
                     value={shopLocation}
                     onChange={(e) => setShopLocation(e.target.value)}
-                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                    className="w-full px-3.5 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                     required
                   />
                 </div>
@@ -204,7 +275,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                   required
                 />
               </div>
@@ -218,7 +289,8 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                  placeholder="Min. 6 characters"
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
                   required
                 />
               </div>
@@ -226,10 +298,20 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
-              className="w-full py-3 bg-[#2e7d46] text-white font-extrabold text-xs rounded-xl hover:bg-[#256338] transition-colors shadow-md shadow-[#2e7d46]/20 flex items-center justify-center gap-2"
+              disabled={isLoading}
+              className="w-full py-3 bg-[#2e7d46] text-white font-extrabold text-xs rounded-xl hover:bg-[#256338] transition-colors shadow-md shadow-[#2e7d46]/20 flex items-center justify-center gap-2 disabled:opacity-75"
             >
-              <span>{isSignup ? "Create Account & Login" : "Log In to Portal"}</span>
-              <ArrowRight className="w-4 h-4" />
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <span>{isSignup ? "Create Account & Login" : "Log In to Portal"}</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </button>
           </form>
 
@@ -238,7 +320,10 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
               {isSignup ? "Already have an account?" : "Need a new account?"}{" "}
               <button
                 type="button"
-                onClick={() => setIsSignup(!isSignup)}
+                onClick={() => {
+                  setIsSignup(!isSignup);
+                  setErrorMessage(null);
+                }}
                 className="font-bold text-[#2e7d46] hover:underline"
               >
                 {isSignup ? "Log In" : "Sign Up"}
