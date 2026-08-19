@@ -179,7 +179,7 @@ export default function App() {
   // Action: Upload Proof Photo
   const handleUploadProof = (jobId: string, photoUrl: string, note: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = `${currentUser?.fullName || "Md. Abdur Rahim"} (Press Owner)`;
+    const actorName = `${currentUser?.fullName || "Press Owner"} (Press Owner)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -210,25 +210,24 @@ export default function App() {
       console.warn("Proof upload backend sync notice:", err.message || err);
     });
 
-    // Add Notification
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        timestamp: "Just now",
-        title: "Proof Uploaded",
-        message: `${currentUser?.businessName || "Nova Lamination"} uploaded test proof for ${jobId}. Review required.`,
-        type: "proof",
-        unread: true,
-        jobId,
-      },
-      ...prev,
-    ]);
+    // Add Notification (in-memory + persisted)
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Proof Uploaded",
+      message: `${currentUser?.businessName || "Press"} uploaded test proof for ${jobId}. Review required.`,
+      type: "proof" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
   };
 
   // Action: Approve Proof (Publisher)
   const handleApproveProof = (jobId: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = `${currentUser?.fullName || "Shahin Ahmed Mithu"} (Publisher)`;
+    const actorName = `${currentUser?.fullName || "Publisher"} (Publisher)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -256,24 +255,23 @@ export default function App() {
       console.warn("Proof approval backend sync notice:", err.message || err);
     });
 
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        timestamp: "Just now",
-        title: "Proof Approved ✓",
-        message: `Publisher approved proof for ${jobId}. Full run unlocked!`,
-        type: "proof",
-        unread: true,
-        jobId,
-      },
-      ...prev,
-    ]);
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Proof Approved ✓",
+      message: `Publisher approved proof for ${jobId}. Full run unlocked!`,
+      type: "proof" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
   };
 
   // Action: Reject Proof (Publisher)
   const handleRejectProof = (jobId: string, feedbackNote: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = `${currentUser?.fullName || "Shahin Ahmed Mithu"} (Publisher)`;
+    const actorName = `${currentUser?.fullName || "Publisher"} (Publisher)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -301,18 +299,17 @@ export default function App() {
       console.warn("Proof rejection backend sync notice:", err.message || err);
     });
 
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        timestamp: "Just now",
-        title: "Proof Rejected ✗",
-        message: `Publisher rejected proof for ${jobId}. Note: "${feedbackNote}"`,
-        type: "proof",
-        unread: true,
-        jobId,
-      },
-      ...prev,
-    ]);
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Proof Rejected ✗",
+      message: `Publisher rejected proof for ${jobId}. Note: "${feedbackNote}"`,
+      type: "proof" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
   };
 
   // Action: Update Yield & Waste
@@ -347,6 +344,8 @@ export default function App() {
   // Action: Generate Invoice
   const handleGenerateInvoice = (job: JobOrder) => {
     const invoiceId = job.invoiceId || `INV-${new Date().getFullYear()}-${job.id.replace('#ORD-', '')}`;
+    const amountBdt = job.amountBdt ?? Math.round(job.coversCount * 12);
+
     setJobs((prev) =>
       prev.map((j) => {
         if (j.id === job.id) {
@@ -355,12 +354,42 @@ export default function App() {
             status: "Invoiced" as const,
             paymentStatus: j.paymentStatus || ("Unpaid" as const),
             invoiceId,
+            amountBdt,
           };
         }
         return j;
       })
     );
-    setSelectedInvoiceModal({ ...job, status: "Invoiced", invoiceId });
+    setSelectedInvoiceModal({ ...job, status: "Invoiced", invoiceId, amountBdt });
+
+    // Persist invoice to Supabase
+    jobService.generateInvoice(job.id, invoiceId, amountBdt).catch((err) => {
+      console.warn("Invoice generation backend sync notice:", err.message || err);
+    });
+
+    // Update publisher outstanding balance
+    const matchPub = publishers.find((p) => p.name === job.publisherName);
+    if (matchPub) {
+      const newBalance = matchPub.outstandingBalanceBdt + amountBdt;
+      setPublishers((prev) =>
+        prev.map((p) =>
+          p.id === matchPub.id ? { ...p, outstandingBalanceBdt: newBalance } : p
+        )
+      );
+      publisherService.updateOutstandingBalance(matchPub.id, newBalance).catch(() => {});
+    }
+
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Invoice Generated",
+      message: `Invoice ${invoiceId} for ${job.bookTitle} — ৳${amountBdt.toLocaleString()} BDT. Awaiting payment.`,
+      type: "order" as const,
+      unread: true,
+      jobId: job.id,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
   };
 
   // Action: Add Stock
@@ -386,34 +415,57 @@ export default function App() {
       prev.map((j) => (j.id === jobId ? { ...j, paymentStatus: "Paid" as const, daysOverdue: 0 } : j))
     );
 
+    // Persist payment to Supabase
+    jobService.markInvoicePaid(jobId).catch((err) => {
+      console.warn("Invoice paid backend sync notice:", err.message || err);
+    });
+
     if (publisherName) {
+      const matchPub = publishers.find((p) => p.name === publisherName);
+      const wasOnHold = matchPub?.creditHoldStatus ?? false;
+
       setPublishers((prev) =>
         prev.map((p) =>
           p.name === publisherName
-            ? { ...p, creditHoldStatus: false, oldestOverdueDays: 0 }
+            ? { ...p, creditHoldStatus: false, oldestOverdueDays: 0, outstandingBalanceBdt: Math.max(0, p.outstandingBalanceBdt - (paidJob?.amountBdt ?? 0)) }
             : p
         )
       );
 
-      const matchPub = publishers.find((p) => p.name === publisherName);
       if (matchPub) {
         publisherService.setCreditHold(matchPub.id, false).catch((err) => {
           console.warn("Credit hold lift backend sync notice:", err.message || err);
         });
+        // Update outstanding balance
+        const newBalance = Math.max(0, matchPub.outstandingBalanceBdt - (paidJob?.amountBdt ?? 0));
+        publisherService.updateOutstandingBalance(matchPub.id, newBalance).catch(() => {});
+      }
+
+      // Only notify credit hold lift if publisher was actually on hold
+      if (wasOnHold) {
+        const holdNotif = {
+          id: `notif-${Date.now()}`,
+          timestamp: "Just now",
+          title: "Credit Hold Lifted ✓",
+          message: `Payment received for ${jobId}. Credit Hold on ${publisherName} automatically lifted!`,
+          type: "credit" as const,
+          unread: true,
+        };
+        setNotifications((prev) => [holdNotif, ...prev]);
+        publisherService.createNotification(holdNotif).catch(() => {});
+      } else {
+        const paidNotif = {
+          id: `notif-${Date.now()}`,
+          timestamp: "Just now",
+          title: "Payment Received ✓",
+          message: `Payment received for invoice on job ${jobId} from ${publisherName}.`,
+          type: "credit" as const,
+          unread: true,
+        };
+        setNotifications((prev) => [paidNotif, ...prev]);
+        publisherService.createNotification(paidNotif).catch(() => {});
       }
     }
-
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        timestamp: "Just now",
-        title: "Credit Hold Lifted ✓",
-        message: `Payment received for ${jobId}. Credit Hold on ${publisherName ?? "publisher"} automatically lifted!`,
-        type: "credit",
-        unread: true,
-      },
-      ...prev,
-    ]);
   };
 
   // Action: Create New Order
@@ -423,8 +475,10 @@ export default function App() {
     laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
     dueDate: string;
   }) => {
-    const id = `#ORD-0${jobs.length + 10}`;
-    const sessionPublisherName = currentUser?.businessName || "Sagorica Publications";
+    const ts = Date.now();
+    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+    const id = `#ORD-${ts}-${rand}`;
+    const sessionPublisherName = currentUser?.businessName || "Unknown Publisher";
     const sessionPressName = "Nova Lamination";
     const newJob: JobOrder = {
       id,
@@ -451,18 +505,26 @@ export default function App() {
       console.warn("Stock deduction backend sync notice:", err.message || err);
     });
 
-    setNotifications((prev) => [
-      {
-        id: `notif-${Date.now()}`,
-        timestamp: "Just now",
-        title: "New Order Submitted",
-        message: `New lamination order ${id} (${newOrd.bookTitle}) placed by ${sessionPublisherName}.`,
-        type: "order",
-        unread: true,
-        jobId: id,
-      },
-      ...prev,
-    ]);
+    // Increment publisher order count
+    const matchPub = publishers.find((p) => p.name === sessionPublisherName);
+    if (matchPub) {
+      setPublishers((prev) =>
+        prev.map((p) => p.id === matchPub.id ? { ...p, totalOrders: p.totalOrders + 1 } : p)
+      );
+      publisherService.incrementPublisherOrder(matchPub.id).catch(() => {});
+    }
+
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "New Order Submitted",
+      message: `New lamination order ${id} (${newOrd.bookTitle}) placed by ${sessionPublisherName}.`,
+      type: "order" as const,
+      unread: true,
+      jobId: id,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
   };
 
   // Initial Session Checking Spinner
