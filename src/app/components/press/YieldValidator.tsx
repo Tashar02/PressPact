@@ -15,7 +15,7 @@ interface YieldValidatorProps {
   jobs: JobOrder[];
   selectedJob: JobOrder | null;
   onSelectJob: (job: JobOrder) => void;
-  onUpdateYield: (
+  onVerifyYield: (
     jobId: string,
     totalIntake: number,
     goodOutput: number,
@@ -28,7 +28,7 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   jobs,
   selectedJob,
   onSelectJob,
-  onUpdateYield,
+  onVerifyYield,
   onGenerateInvoice,
 }) => {
   const currentJob = selectedJob || jobs[0];
@@ -58,14 +58,14 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
 
   const handleSaveDraft = () => {
     if (!currentJob) return;
-    onUpdateYield(currentJob.id, totalIntake, goodOutput, wasteCount);
+    onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
     setToastMessage("Yield breakdown saved to job ledger draft.");
     setTimeout(() => setToastMessage(null), 3000);
   };
 
   const handleInvoiceClick = () => {
     if (!isMatched || !currentJob) return;
-    onUpdateYield(currentJob.id, totalIntake, goodOutput, wasteCount);
+    onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
     onGenerateInvoice(currentJob);
   };
 
