@@ -162,3 +162,14 @@ CREATE INDEX IF NOT EXISTS idx_job_orders_publisher_id ON job_orders(publisher_i
 CREATE INDEX IF NOT EXISTS idx_proof_logs_job_id ON proof_logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(unread);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+
+-- Helper function to atomically increment a publisher's total_orders count
+CREATE OR REPLACE FUNCTION increment_publisher_orders(pub_id TEXT)
+RETURNS VOID AS $$
+BEGIN
+  UPDATE publishers
+  SET total_orders = total_orders + 1
+  WHERE id = pub_id;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+

@@ -91,4 +91,58 @@ export const publisherService = {
       console.error("Error marking notification read:", error);
     }
   },
+
+  /**
+   * Persist a new notification to Supabase
+   */
+  async createNotification(notification: {
+    title: string;
+    message: string;
+    type: "proof" | "yield" | "credit" | "stock" | "order";
+    jobId?: string;
+  }): Promise<void> {
+    const { error } = await supabase.from("notifications").insert([
+      {
+        title: notification.title,
+        message: notification.message,
+        type: notification.type,
+        unread: true,
+        job_id: notification.jobId || null,
+      },
+    ]);
+
+    if (error) {
+      console.warn("Notification persist notice:", error.message);
+    }
+  },
+
+  /**
+   * Increment the total_orders count for a publisher
+   */
+  async incrementPublisherOrder(publisherId: string): Promise<void> {
+    const { error } = await supabase.rpc("increment_publisher_orders", {
+      pub_id: publisherId,
+    });
+
+    if (error) {
+      console.warn("Publisher order increment notice:", error.message);
+    }
+  },
+
+  /**
+   * Update outstanding balance for a publisher
+   */
+  async updateOutstandingBalance(
+    publisherId: string,
+    amountBdt: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("publishers")
+      .update({ outstanding_balance_bdt: amountBdt })
+      .eq("id", publisherId);
+
+    if (error) {
+      console.warn("Publisher balance update notice:", error.message);
+    }
+  },
 };
