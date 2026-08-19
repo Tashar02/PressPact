@@ -38,3 +38,12 @@ Follow these steps to set up the relational database schema and initial seed dat
    * **Project URL** (e.g. `https://xyzcompany.supabase.co`)
    * **anon / public Key** (e.g. `eyJhbGciOi...`)
 3. Keep these ready for your local `.env` file and Vercel environment settings.
+
+---
+
+### **Step 5: Create Storage Bucket for Quality Proofs**
+1. In your Supabase Dashboard, click on **Storage** from the left sidebar.
+2. Click **New Bucket**.
+3. Name the bucket: `proofs`
+4. Toggle **Public bucket** to `ON` (enables press and publisher to view uploaded sample photos).
+5. Click **Save bucket**.
