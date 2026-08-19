@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   UserRole,
   JobOrder,
@@ -12,6 +12,9 @@ import {
   INITIAL_PUBLISHERS,
   INITIAL_NOTIFICATIONS,
 } from "./mockData";
+import { jobService } from "./services/jobService";
+import { stockService } from "./services/stockService";
+import { publisherService } from "./services/publisherService";
 import { DesktopSidebar } from "./components/layout/DesktopSidebar";
 import { TopHeader } from "./components/layout/TopHeader";
 import { AuthPages } from "./components/auth/AuthPages";
@@ -42,6 +45,33 @@ export default function App() {
   const [stock, setStock] = useState<FilmStockItem[]>(INITIAL_STOCK);
   const [publishers, setPublishers] = useState<PublisherClient[]>(INITIAL_PUBLISHERS);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+
+  // Fetch live master data from Supabase backend on load
+  useEffect(() => {
+    async function loadBackendData() {
+      setIsLoading(true);
+      try {
+        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs] = await Promise.all([
+          jobService.fetchJobOrders(),
+          stockService.fetchFilmStock(),
+          publisherService.fetchPublishers(),
+          publisherService.fetchNotifications(),
+        ]);
+
+        if (fetchedJobs && fetchedJobs.length > 0) setJobs(fetchedJobs);
+        if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
+        if (fetchedPublishers && fetchedPublishers.length > 0) setPublishers(fetchedPublishers);
+        if (fetchedNotifs && fetchedNotifs.length > 0) setNotifications(fetchedNotifs);
+      } catch (err) {
+        console.info("Using local master dataset until Supabase credentials are plugged in.");
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    loadBackendData();
+  }, []);
 
   // Selected State for Modals
   const [selectedJobModal, setSelectedJobModal] = useState<JobOrder | null>(null);
@@ -76,6 +106,8 @@ export default function App() {
   // Action: Upload Proof Photo
   const handleUploadProof = (jobId: string, photoUrl: string, note: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const actorName = "Md. Abdur Rahim (Press Owner)";
+
     setJobs((prev) =>
       prev.map((j) => {
         if (j.id === jobId) {
@@ -83,7 +115,7 @@ export default function App() {
             id: `log-${Date.now()}`,
             timestamp: now,
             action: "uploaded" as const,
-            actor: "Md. Abdur Rahim (Press Owner)",
+            actor: actorName,
             role: "press_owner" as const,
             note: note,
             photoUrl: photoUrl,
@@ -99,6 +131,11 @@ export default function App() {
         return j;
       })
     );
+
+    // Sync to Supabase
+    jobService.uploadProof(jobId, photoUrl, note, actorName).catch((err) => {
+      console.warn("Proof upload backend sync notice:", err.message || err);
+    });
 
     // Add Notification
     setNotifications((prev) => [
@@ -118,6 +155,8 @@ export default function App() {
   // Action: Approve Proof (Publisher)
   const handleApproveProof = (jobId: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const actorName = `${publisherContact} (Publisher)`;
+
     setJobs((prev) =>
       prev.map((j) => {
         if (j.id === jobId) {
@@ -125,7 +164,7 @@ export default function App() {
             id: `log-${Date.now()}`,
             timestamp: now,
             action: "approved" as const,
-            actor: `${publisherContact} (Publisher)`,
+            actor: actorName,
             role: "publisher" as const,
             note: "Approved for full production run.",
           };
@@ -138,6 +177,11 @@ export default function App() {
         return j;
       })
     );
+
+    // Sync to Supabase
+    jobService.approveProof(jobId, actorName).catch((err) => {
+      console.warn("Proof approval backend sync notice:", err.message || err);
+    });
 
     setNotifications((prev) => [
       {
@@ -156,6 +200,8 @@ export default function App() {
   // Action: Reject Proof (Publisher)
   const handleRejectProof = (jobId: string, feedbackNote: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
+    const actorName = `${publisherContact} (Publisher)`;
+
     setJobs((prev) =>
       prev.map((j) => {
         if (j.id === jobId) {
@@ -163,7 +209,7 @@ export default function App() {
             id: `log-${Date.now()}`,
             timestamp: now,
             action: "rejected" as const,
-            actor: `${publisherContact} (Publisher)`,
+            actor: actorName,
             role: "publisher" as const,
             note: feedbackNote,
           };
@@ -176,6 +222,11 @@ export default function App() {
         return j;
       })
     );
+
+    // Sync to Supabase
+    jobService.rejectProof(jobId, actorName, feedbackNote).catch((err) => {
+      console.warn("Proof rejection backend sync notice:", err.message || err);
+    });
 
     setNotifications((prev) => [
       {
@@ -212,6 +263,13 @@ export default function App() {
         return j;
       })
     );
+
+    // Sync to Supabase
+    if (goodOutput + wasteCount === totalIntake) {
+      jobService.verifyYield(jobId, totalIntake, goodOutput, wasteCount).catch((err) => {
+        console.warn("Yield verification backend sync notice:", err.message || err);
+      });
+    }
   };
 
   // Action: Generate Invoice
@@ -238,11 +296,17 @@ export default function App() {
     setStock((prev) =>
       prev.map((s) => (s.type === type ? { ...s, availableMeters: s.availableMeters + meters } : s))
     );
+
+    const matchItem = stock.find((s) => s.type === type);
+    if (matchItem) {
+      stockService.restockItem(matchItem.id, meters).catch((err) => {
+        console.warn("Stock restock backend sync notice:", err.message || err);
+      });
+    }
   };
 
   // Action: Mark Invoice Paid (Lift Credit Hold automatically - FR-4.4)
   const handleMarkInvoicePaid = (jobId: string) => {
-    // Find the job to get the publisher name dynamically
     const paidJob = jobs.find((j) => j.id === jobId);
     const publisherName = paidJob?.publisherName;
 
@@ -250,7 +314,6 @@ export default function App() {
       prev.map((j) => (j.id === jobId ? { ...j, paymentStatus: "Paid" as const, daysOverdue: 0 } : j))
     );
 
-    // Automatically Lift Credit Hold for the publisher tied to this job!
     if (publisherName) {
       setPublishers((prev) =>
         prev.map((p) =>
@@ -259,6 +322,13 @@ export default function App() {
             : p
         )
       );
+
+      const matchPub = publishers.find((p) => p.name === publisherName);
+      if (matchPub) {
+        publisherService.setCreditHold(matchPub.id, false).catch((err) => {
+          console.warn("Credit hold lift backend sync notice:", err.message || err);
+        });
+      }
     }
 
     setNotifications((prev) => [
@@ -274,9 +344,7 @@ export default function App() {
     ]);
   };
 
-  // Action: Create New Order
-  // NOTE: In the real backend, publisherName and pressName will come from the authenticated
-  // user's session token — they are NOT hardcoded. This is prototype-only context.
+
   const handleCreateOrder = (newOrd: {
     bookTitle: string;
     coversCount: number;
@@ -284,7 +352,6 @@ export default function App() {
     dueDate: string;
   }) => {
     const id = `#ORD-0${jobs.length + 10}`;
-    // Prototype: publisher identity comes from logged-in session in production
     const sessionPublisherName = "Sagorica Publications";
     const sessionPressName = "Nova Lamination";
     const newJob: JobOrder = {
@@ -303,6 +370,14 @@ export default function App() {
 
     setJobs((prev) => [newJob, ...prev]);
 
+    // Sync to Supabase
+    jobService.createJobOrder(newJob).catch((err) => {
+      console.warn("New order backend creation notice:", err.message || err);
+    });
+    stockService.deductStock(newOrd.laminationType, newJob.estimatedFilmMeters).catch((err) => {
+      console.warn("Stock deduction backend sync notice:", err.message || err);
+    });
+
     setNotifications((prev) => [
       {
         id: `notif-${Date.now()}`,
@@ -316,6 +391,7 @@ export default function App() {
       ...prev,
     ]);
   };
+
 
   if (!isLoggedIn) {
     return <AuthPages onLoginSuccess={(role) => { setUserRole(role); setIsLoggedIn(true); }} />;
