@@ -126,27 +126,35 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
             </div>
 
             {/* High Res Photo Frame */}
-            <div className="relative rounded-2xl overflow-hidden bg-gray-900 border border-gray-200 shadow-inner h-72 group">
-              <img
-                src={
-                  currentJob.proofPhotoUrl ||
-                  "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80"
-                }
-                alt="Uploaded proof sample"
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
-                <div className="text-white space-y-0.5">
-                  <p className="text-xs font-bold flex items-center gap-1.5">
-                    <ImageIcon className="w-4 h-4 text-emerald-400" />
-                    Uploaded Proof Sample (2 Test Covers)
-                  </p>
-                  <p className="text-[11px] text-gray-300">
-                    Finish: <strong>{currentJob.laminationType}</strong>
-                  </p>
+            <div className="relative rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-inner h-72 group">
+              {currentJob.proofPhotoUrl ? (
+                <>
+                  <img
+                    src={currentJob.proofPhotoUrl}
+                    alt="Uploaded proof sample"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
+                    <div className="text-white space-y-0.5">
+                      <p className="text-xs font-bold flex items-center gap-1.5">
+                        <ImageIcon className="w-4 h-4 text-emerald-400" />
+                        Uploaded Proof Sample (2 Test Covers)
+                      </p>
+                      <p className="text-[11px] text-gray-300">
+                        Finish: <strong>{currentJob.laminationType}</strong>
+                      </p>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
+                  <ImageIcon className="w-10 h-10" />
+                  <p className="text-xs font-semibold">No proof photo uploaded yet</p>
+                  <p className="text-[10px] text-gray-400">Waiting for press to upload a sample</p>
                 </div>
-              </div>
+              )}
             </div>
+
 
             {/* Press Note */}
             <div className="p-4 bg-emerald-50/60 rounded-xl border border-emerald-100 space-y-1">
