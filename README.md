@@ -33,6 +33,16 @@ PressPact/
 │   │   ├── types.ts           # Core TypeScript interfaces
 │   │   └── App.tsx            # Main application layout & role state
 │   └── main.tsx               # React application entry point
+├── supabase/
+│   ├── schema.sql             # Relational DDL tables, indexes, check clauses
+│   ├── seed.sql               # Initial pilot seed data
+│   └── README.md              # Database setup & SQL execution guide
 ├── SRS.md                     # Software Requirements Specification (IEEE 830)
 └── package.json               # Dependencies and build scripts
 ```
+
+---
+
+## 🗄️ Database Setup
+
+For detailed instructions on initializing the PostgreSQL schema, indexes, and initial seed data on Supabase, refer to the [Supabase Database Setup Guide](file:///home/tashar/PressPact/supabase/README.md).
