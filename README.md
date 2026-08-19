@@ -33,6 +33,7 @@ PressPact/
 │   │   ├── lib/
 │   │   │   └── supabase.ts    # Supabase client instantiation
 │   │   ├── services/
+│   │   │   ├── authService.ts      # Authentication & user profile backend calls
 │   │   │   ├── jobService.ts       # Job orders & proof audit log backend calls
 │   │   │   ├── stockService.ts     # Film stock inventory backend calls
 │   │   │   └── publisherService.ts # Publisher credit hold & notification backend calls
@@ -41,7 +42,7 @@ PressPact/
 │   │   └── App.tsx            # Main application layout & state sync
 │   └── main.tsx               # React application entry point
 ├── supabase/
-│   ├── schema.sql             # Relational DDL tables, indexes, check clauses
+│   ├── schema.sql             # Relational DDL tables, profiles, indexes, triggers
 │   ├── seed.sql               # Initial pilot seed data
 │   └── README.md              # Database setup & SQL execution guide
 ├── SRS.md                     # Software Requirements Specification (IEEE 830)
