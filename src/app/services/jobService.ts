@@ -34,11 +34,14 @@ export const jobService = {
   /**
    * Fetch all job orders along with their nested proof audit logs
    */
-  async fetchJobOrders(): Promise<JobOrder[]> {
-    const { data: jobs, error: jobsError } = await supabase
-      .from("job_orders")
-      .select("*")
-      .order("created_at", { ascending: false });
+  async fetchJobOrders(publisherName?: string): Promise<JobOrder[]> {
+    let query = supabase.from("job_orders").select("*").order("created_at", { ascending: false });
+    
+    if (publisherName) {
+      query = query.eq("publisher_name", publisherName);
+    }
+
+    const { data: jobs, error: jobsError } = await query;
 
     if (jobsError) {
       console.error("Error fetching job orders from Supabase:", jobsError);
@@ -71,6 +74,43 @@ export const jobService = {
     });
 
     return (jobs || []).map((job: any) => mapDbToJobOrder(job, logsByJobId[job.id] || []));
+  },
+
+  /**
+   * Upload proof image file to Supabase Storage bucket 'proofs'
+   */
+  async uploadProofImageFile(file: File, jobId: string): Promise<string> {
+    try {
+      const fileExt = file.name.split(".").pop() || "jpg";
+      const fileName = `${jobId.replace("#", "")}-${Date.now()}.${fileExt}`;
+      const filePath = `samples/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("proofs")
+        .upload(filePath, file, {
+          cacheControl: "3600",
+          upsert: true,
+        });
+
+      if (uploadError) {
+        console.warn("Supabase Storage bucket upload notice:", uploadError.message);
+        // Fallback to local Data URL for seamless client viewing if bucket policies aren't created yet
+        return new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const { data } = supabase.storage.from("proofs").getPublicUrl(filePath);
+      return data.publicUrl;
+    } catch (e) {
+      return new Promise<string>((resolve) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.readAsDataURL(file);
+      });
+    }
   },
 
   /**
