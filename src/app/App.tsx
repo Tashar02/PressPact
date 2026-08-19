@@ -114,17 +114,14 @@ export default function App() {
           publisherService.fetchNotifications(),
         ]);
 
-        const resolvedJobs = (fetchedJobs && fetchedJobs.length > 0) ? fetchedJobs : null;
-        const resolvedPublishers = (fetchedPublishers && fetchedPublishers.length > 0) ? fetchedPublishers : null;
-
-        if (resolvedJobs) setJobs(resolvedJobs);
+        setJobs(fetchedJobs || []);
         if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
-        if (resolvedPublishers) setPublishers(resolvedPublishers);
-        if (fetchedNotifs && fetchedNotifs.length > 0) setNotifications(fetchedNotifs);
+        setPublishers(fetchedPublishers || []);
+        setNotifications(fetchedNotifs || []);
 
         // Real-time credit hold: check right now, not on a nightly cron.
-        if (resolvedJobs && resolvedPublishers) {
-          await checkAndApplyCreditHolds(resolvedJobs, resolvedPublishers);
+        if (fetchedJobs && fetchedPublishers) {
+          await checkAndApplyCreditHolds(fetchedJobs, fetchedPublishers);
         }
       } catch (err) {
         console.info("Using local master dataset fallback.");
@@ -223,6 +220,31 @@ export default function App() {
       (j) => j.publisherName.toLowerCase() === userBusinessName
     );
   }, [jobs, userRole, currentUser]);
+
+  // Dynamic filter: Users only see notifications related to their own jobs/actions
+  const visibleNotifications = useMemo(() => {
+    if (!currentUser) return [];
+    const userBusinessName = currentUser.businessName.toLowerCase();
+
+    if (userRole === "press_owner") {
+      // Press Owner sees all notifications or those related to their jobs
+      return notifications.filter((n) => {
+        if (!n.jobId) return true; // General stock / system notifications
+        const job = jobs.find((j) => j.id === n.jobId);
+        return !job || job.pressName.toLowerCase() === userBusinessName;
+      });
+    }
+
+    // Publisher only sees notifications related to their jobs
+    return notifications.filter((n) => {
+      if (!n.jobId) {
+        // If it's a general notice, only show if it matches their business name
+        return n.message.toLowerCase().includes(userBusinessName);
+      }
+      const job = jobs.find((j) => j.id === n.jobId);
+      return job && job.publisherName.toLowerCase() === userBusinessName;
+    });
+  }, [notifications, jobs, userRole, currentUser]);
 
   // Dynamic Credit Hold Status for logged-in Publisher
   const currentPublisherData = currentUser
@@ -650,7 +672,7 @@ export default function App() {
           onRoleToggle={handleRoleToggle}
           onLogout={handleLogout}
           activeTabTitle={tabTitles[activeTab] || "PressPact Portal"}
-          notifications={notifications}
+          notifications={visibleNotifications}
           onMarkNotificationsRead={() =>
             setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
           }
