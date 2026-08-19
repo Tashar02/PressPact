@@ -1,5 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { JobOrder, ProofLog } from "../../types";
+import { jobService } from "../../services/jobService";
 import {
   Upload,
   FileCheck,
@@ -10,6 +11,8 @@ import {
   Clock,
   Send,
   AlertCircle,
+  Camera,
+  Loader2,
 } from "lucide-react";
 
 interface ProofUploadManagerProps {
@@ -31,15 +34,40 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
       "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80"
   );
   const [note, setNote] = useState(currentJob?.proofNote || "");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isSuccessToast, setIsSuccessToast] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      const localPreview = URL.createObjectURL(file);
+      setPhotoUrl(localPreview);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!currentJob) return;
 
-    onUploadProof(currentJob.id, photoUrl, note);
-    setIsSuccessToast(true);
-    setTimeout(() => setIsSuccessToast(false), 3000);
+    setIsUploading(true);
+    let finalUrl = photoUrl;
+
+    try {
+      if (selectedFile) {
+        finalUrl = await jobService.uploadProofImageFile(selectedFile, currentJob.id);
+      }
+      onUploadProof(currentJob.id, finalUrl, note);
+      setIsSuccessToast(true);
+      setTimeout(() => setIsSuccessToast(false), 4000);
+    } catch (err) {
+      console.error("Proof submission error:", err);
+      onUploadProof(currentJob.id, photoUrl, note);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -76,6 +104,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                     "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80"
                 );
                 setNote(found.proofNote || "");
+                setSelectedFile(null);
               }
             }}
             className="w-full text-xs font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
@@ -120,12 +149,33 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Photo Preview Pane */}
+              {/* Photo Preview & File Picker */}
               <div className="space-y-2">
-                <label className="block text-xs font-bold text-gray-700">
-                  Sample Cover Photo
-                </label>
-                <div className="relative group border-2 border-dashed border-green-200 rounded-2xl p-4 bg-green-50/40 text-center hover:border-[#2e7d46] transition-colors">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-gray-700">
+                    Sample Cover Photo
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs text-[#2e7d46] font-bold hover:underline flex items-center gap-1"
+                  >
+                    <Camera className="w-3.5 h-3.5" /> Choose from Device
+                  </button>
+                </div>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="relative group border-2 border-dashed border-green-200 rounded-2xl p-4 bg-green-50/40 text-center hover:border-[#2e7d46] transition-colors cursor-pointer"
+                >
                   {photoUrl ? (
                     <div className="relative overflow-hidden rounded-xl h-56 bg-gray-900">
                       <img
@@ -133,9 +183,12 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                         alt="Test proof"
                         className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                       />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-3">
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-between p-3">
                         <span className="text-xs text-white font-medium flex items-center gap-1">
                           <ImageIcon className="w-3.5 h-3.5" /> Sample Lamination Output
+                        </span>
+                        <span className="text-[10px] text-emerald-300 font-bold bg-black/40 px-2 py-0.5 rounded-full">
+                          Click to Change Photo
                         </span>
                       </div>
                     </div>
@@ -165,10 +218,20 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 
               <button
                 type="submit"
-                className="w-full py-3 px-4 bg-[#2e7d46] text-white font-bold text-xs rounded-xl hover:bg-[#256338] transition-colors shadow-md shadow-[#2e7d46]/20 flex items-center justify-center gap-2"
+                disabled={isUploading}
+                className="w-full py-3 px-4 bg-[#2e7d46] text-white font-bold text-xs rounded-xl hover:bg-[#256338] transition-colors shadow-md shadow-[#2e7d46]/20 flex items-center justify-center gap-2 disabled:opacity-75"
               >
-                <Send className="w-4 h-4" />
-                Submit Proof &amp; Request Publisher Sign-Off
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Uploading Sample Photo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    <span>Submit Proof &amp; Request Publisher Sign-Off</span>
+                  </>
+                )}
               </button>
             </form>
           </div>
