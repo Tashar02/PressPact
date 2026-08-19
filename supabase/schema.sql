@@ -91,8 +91,74 @@ CREATE TABLE IF NOT EXISTS notifications (
     job_id TEXT
 );
 
+-- 6. User Profiles Table (Linked to Supabase Auth auth.users)
+CREATE TABLE IF NOT EXISTS profiles (
+    id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+    email TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('press_owner', 'publisher')),
+    full_name TEXT NOT NULL,
+    business_name TEXT NOT NULL,
+    phone TEXT,
+    location TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Function to handle new user registration from Supabase Auth
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+    user_role TEXT;
+    user_full_name TEXT;
+    user_business_name TEXT;
+    user_phone TEXT;
+    user_location TEXT;
+BEGIN
+    user_role := COALESCE(NEW.raw_user_meta_data->>'role', 'publisher');
+    user_full_name := COALESCE(NEW.raw_user_meta_data->>'fullName', NEW.raw_user_meta_data->>'full_name', 'User');
+    user_business_name := COALESCE(NEW.raw_user_meta_data->>'businessName', NEW.raw_user_meta_data->>'business_name', 'Independent Business');
+    user_phone := COALESCE(NEW.raw_user_meta_data->>'phone', '');
+    user_location := COALESCE(NEW.raw_user_meta_data->>'shopLocation', NEW.raw_user_meta_data->>'location', 'Dhaka, Bangladesh');
+
+    -- Insert into profiles table
+    INSERT INTO public.profiles (id, email, role, full_name, business_name, phone, location)
+    VALUES (NEW.id, NEW.email, user_role, user_full_name, user_business_name, user_phone, user_location)
+    ON CONFLICT (id) DO UPDATE SET
+        full_name = EXCLUDED.full_name,
+        business_name = EXCLUDED.business_name,
+        phone = EXCLUDED.phone,
+        location = EXCLUDED.location;
+
+    -- If publisher, also ensure record in publishers table
+    IF user_role = 'publisher' THEN
+        INSERT INTO public.publishers (id, name, contact_person, phone, email, location, total_orders, outstanding_balance_bdt, oldest_overdue_days, credit_hold_status)
+        VALUES (
+            NEW.id::text,
+            user_business_name,
+            user_full_name,
+            user_phone,
+            NEW.email,
+            user_location,
+            0,
+            0.00,
+            0,
+            FALSE
+        )
+        ON CONFLICT (id) DO NOTHING;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger to execute handle_new_user on signup
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
 -- Create performance indexes for frequent query paths
 CREATE INDEX IF NOT EXISTS idx_job_orders_status ON job_orders(status);
 CREATE INDEX IF NOT EXISTS idx_job_orders_publisher_id ON job_orders(publisher_id);
 CREATE INDEX IF NOT EXISTS idx_proof_logs_job_id ON proof_logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(unread);
+CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
