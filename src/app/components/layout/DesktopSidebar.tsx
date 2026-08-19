@@ -1,5 +1,5 @@
 import React from "react";
-import { UserRole } from "../../types";
+import { UserRole, UserProfile } from "../../types";
 import {
   LayoutDashboard,
   FileCheck,
@@ -16,6 +16,7 @@ import {
 
 interface DesktopSidebarProps {
   role: UserRole;
+  currentUser?: UserProfile | null;
   activeTab: string;
   onTabChange: (tab: string) => void;
   pendingProofsCount: number;
@@ -26,6 +27,7 @@ interface DesktopSidebarProps {
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   role,
+  currentUser,
   activeTab,
   onTabChange,
   pendingProofsCount,
@@ -104,6 +106,17 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
   const menuItems = isPress ? pressMenuItems : publisherMenuItems;
 
+  // Compute display initials
+  const displayName = currentUser?.fullName || (isPress ? "Md. Abdur Rahim" : "Shahin Ahmed Mithu");
+  const displayBusiness = currentUser?.businessName || (isPress ? "Nova Lamination (Press)" : "Sagorica Publications");
+  const initials = displayName
+    .split(" ")
+    .map((n) => n[0])
+    .filter(Boolean)
+    .join("")
+    .slice(0, 2)
+    .toUpperCase() || "PP";
+
   return (
     <aside className="hidden lg:flex flex-col w-64 bg-white border-r border-green-100 shadow-sm shrink-0 select-none z-20">
       {/* Brand Header */}
@@ -121,11 +134,11 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 
       {/* Role Indicator Banner */}
       <div className="px-4 py-3 mx-4 mt-4 rounded-xl bg-gradient-to-r from-green-50 to-emerald-50/60 border border-green-200/60 flex items-center gap-2.5">
-        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+        <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
         <div className="overflow-hidden">
           <p className="text-[10px] font-bold text-green-800 uppercase tracking-widest">Active Workspace</p>
-          <p className="text-xs font-bold text-green-950 truncate">
-            {isPress ? "Nova Lamination (Press)" : "Sagorica Publications"}
+          <p className="text-xs font-bold text-green-950 truncate" title={displayBusiness}>
+            {displayBusiness}
           </p>
         </div>
       </div>
@@ -177,19 +190,19 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
       {/* Bottom User / Quick Info */}
       <div className="p-4 border-t border-green-100 bg-green-50/30 space-y-3">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold text-xs flex items-center justify-center">
-            {isPress ? "AR" : "SM"}
+          <div className="w-8 h-8 rounded-full bg-emerald-700 text-white font-bold text-xs flex items-center justify-center shrink-0">
+            {initials}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-xs font-bold text-gray-900 truncate">
-              {isPress ? "Md. Abdur Rahim" : "Shahin Ahmed Mithu"}
+            <p className="text-xs font-bold text-gray-900 truncate" title={displayName}>
+              {displayName}
             </p>
             <p className="text-[11px] text-gray-500 capitalize">{role.replace("_", " ")}</p>
           </div>
           <button
             onClick={onLogout}
             title="Log out"
-            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
           >
             <LogOut className="w-4 h-4" />
           </button>

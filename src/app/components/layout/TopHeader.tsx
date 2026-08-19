@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { UserRole, NotificationItem } from "../../types";
+import { UserRole, UserProfile, NotificationItem } from "../../types";
 import {
   Bell,
   Search,
@@ -10,11 +10,15 @@ import {
   AlertCircle,
   FileText,
   ShieldAlert,
+  LogOut,
+  User,
 } from "lucide-react";
 
 interface TopHeaderProps {
   role: UserRole;
-  onRoleToggle: () => void;
+  currentUser?: UserProfile | null;
+  onRoleToggle?: () => void;
+  onLogout?: () => void;
   activeTabTitle: string;
   notifications: NotificationItem[];
   onMarkNotificationsRead: () => void;
@@ -24,7 +28,9 @@ interface TopHeaderProps {
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
   role,
+  currentUser,
   onRoleToggle,
+  onLogout,
   activeTabTitle,
   notifications,
   onMarkNotificationsRead,
@@ -34,6 +40,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const [showNotifs, setShowNotifs] = useState(false);
   const unreadCount = notifications.filter((n) => n.unread).length;
   const isPress = role === "press_owner";
+
+  const displayName = currentUser?.fullName || (isPress ? "Md. Abdur Rahim" : "Shahin Ahmed Mithu");
+  const displayBusiness = currentUser?.businessName || (isPress ? "Nova Lamination" : "Sagorica Publications");
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-green-100 px-4 lg:px-6 py-3 flex items-center justify-between gap-4 shadow-xs">
@@ -48,7 +57,9 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
 
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 font-medium">PressPact Portal</span>
+            <span className="text-xs text-gray-500 font-medium truncate max-w-[120px] sm:max-w-none">
+              {displayBusiness}
+            </span>
             <span className="text-xs text-gray-300">/</span>
             <span className="text-xs font-semibold text-green-700 capitalize">
               {isPress ? "Press Owner" : "Publisher Client"}
@@ -72,13 +83,13 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         </div>
       </div>
 
-      {/* Right controls: Notifications */}
+      {/* Right controls: Notifications & User */}
       <div className="flex items-center gap-3">
         {/* Notifications Bell & Dropdown */}
         <div className="relative">
           <button
             onClick={() => setShowNotifs(!showNotifs)}
-            className="relative p-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 hover:bg-green-50 hover:text-green-800 transition-colors"
+            className="relative p-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 hover:bg-green-50 hover:text-green-800 transition-colors cursor-pointer"
           >
             <Bell className="w-4 h-4" />
             {unreadCount > 0 && (
@@ -103,7 +114,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 {unreadCount > 0 && (
                   <button
                     onClick={onMarkNotificationsRead}
-                    className="text-xs text-[#2e7d46] font-semibold hover:underline"
+                    className="text-xs text-[#2e7d46] font-semibold hover:underline cursor-pointer"
                   >
                     Mark all read
                   </button>
@@ -147,6 +158,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
             </div>
           )}
         </div>
+
+        {/* Mobile Logout Button */}
+        {onLogout && (
+          <button
+            onClick={onLogout}
+            title="Log out"
+            className="lg:hidden p-2.5 rounded-xl bg-gray-50 border border-gray-200 text-gray-600 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        )}
       </div>
     </header>
   );
