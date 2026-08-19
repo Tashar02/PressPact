@@ -162,19 +162,18 @@ export default function App() {
   // Dynamic filter: Publisher only sees their own orders; Press Owner sees all orders
   const visibleJobs = useMemo(() => {
     if (userRole === "press_owner") return jobs;
-    if (!currentUser) return jobs;
-    const publisherOrders = jobs.filter(
+    if (!currentUser) return [];
+    // Show only this publisher's own orders — new publishers start with an empty list
+    return jobs.filter(
       (j) => j.publisherName.toLowerCase() === currentUser.businessName.toLowerCase()
     );
-    // If brand new publisher has no orders yet, return their empty/new list
-    return publisherOrders.length > 0 ? publisherOrders : jobs.filter(j => j.publisherName === "Sagorica Publications");
   }, [jobs, userRole, currentUser]);
 
   // Dynamic Credit Hold Status for logged-in Publisher
-  const currentPublisherData = publishers.find(
-    (p) => p.name.toLowerCase() === (currentUser?.businessName || "Sagorica Publications").toLowerCase()
-  );
-  const isCreditHoldActive = currentPublisherData ? currentPublisherData.creditHoldStatus : false;
+  const currentPublisherData = currentUser
+    ? publishers.find((p) => p.name.toLowerCase() === currentUser.businessName.toLowerCase())
+    : undefined;
+  const isCreditHoldActive = currentPublisherData?.creditHoldStatus ?? false;
   const overdueJob = visibleJobs.find((j) => j.paymentStatus === "Overdue") || null;
 
   // Action: Upload Proof Photo
