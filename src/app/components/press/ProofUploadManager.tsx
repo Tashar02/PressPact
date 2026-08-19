@@ -30,8 +30,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 }) => {
   const currentJob = selectedJob || jobs[0];
   const [photoUrl, setPhotoUrl] = useState(
-    currentJob?.proofPhotoUrl ||
-      "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80"
+    currentJob?.proofPhotoUrl || ""
   );
   const [note, setNote] = useState(currentJob?.proofNote || "");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -99,10 +98,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
               const found = jobs.find((j) => j.id === e.target.value);
               if (found) {
                 onSelectJob(found);
-                setPhotoUrl(
-                  found.proofPhotoUrl ||
-                    "https://images.unsplash.com/photo-1544716278-ca5e3f4abd8c?auto=format&fit=crop&w=800&q=80"
-                );
+                setPhotoUrl(found.proofPhotoUrl || "");
                 setNote(found.proofNote || "");
                 setSelectedFile(null);
               }
