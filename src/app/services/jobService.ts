@@ -251,4 +251,40 @@ export const jobService = {
 
     if (error) throw error;
   },
+
+  /**
+   * Generate an invoice for a job and persist it to Supabase
+   */
+  async generateInvoice(
+    jobId: string,
+    invoiceId: string,
+    amountBdt: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("job_orders")
+      .update({
+        invoice_id: invoiceId,
+        amount_bdt: amountBdt,
+        payment_status: "Unpaid",
+        status: "Invoiced",
+      })
+      .eq("id", jobId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Mark an invoice as paid and clear overdue days
+   */
+  async markInvoicePaid(jobId: string): Promise<void> {
+    const { error } = await supabase
+      .from("job_orders")
+      .update({
+        payment_status: "Paid",
+        days_overdue: 0,
+      })
+      .eq("id", jobId);
+
+    if (error) throw error;
+  },
 };
