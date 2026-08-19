@@ -706,7 +706,7 @@ export default function App() {
               )}
 
               {activeTab === "stock" && (
-                <MaterialStockManager stock={stock} onAddStock={handleAddStock} />
+                <MaterialStockManager stock={stock} jobs={jobs} onAddStock={handleAddStock} />
               )}
 
               {activeTab === "clients" && (
