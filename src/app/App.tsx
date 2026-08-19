@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   UserRole,
+  UserProfile,
   JobOrder,
   FilmStockItem,
   PublisherClient,
@@ -12,6 +13,8 @@ import {
   INITIAL_PUBLISHERS,
   INITIAL_NOTIFICATIONS,
 } from "./mockData";
+import { supabase } from "./lib/supabase";
+import { authService } from "./services/authService";
 import { jobService } from "./services/jobService";
 import { stockService } from "./services/stockService";
 import { publisherService } from "./services/publisherService";
@@ -33,45 +36,20 @@ import { CreditHoldBanner } from "./components/publisher/CreditHoldBanner";
 import { JobDetailsModal } from "./components/common/JobDetailsModal";
 import { ContactModal } from "./components/common/ContactModal";
 import { InvoiceModal } from "./components/common/InvoiceModal";
-import { X, Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle } from "lucide-react";
+import { X, Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [userRole, setUserRole] = useState<UserRole>("press_owner");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const [activeTab, setActiveTab] = useState<string>("dashboard");
+  const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
 
   // App Master Data State
   const [jobs, setJobs] = useState<JobOrder[]>(INITIAL_JOBS);
   const [stock, setStock] = useState<FilmStockItem[]>(INITIAL_STOCK);
   const [publishers, setPublishers] = useState<PublisherClient[]>(INITIAL_PUBLISHERS);
   const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-
-  // Fetch live master data from Supabase backend on load
-  useEffect(() => {
-    async function loadBackendData() {
-      setIsLoading(true);
-      try {
-        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs] = await Promise.all([
-          jobService.fetchJobOrders(),
-          stockService.fetchFilmStock(),
-          publisherService.fetchPublishers(),
-          publisherService.fetchNotifications(),
-        ]);
-
-        if (fetchedJobs && fetchedJobs.length > 0) setJobs(fetchedJobs);
-        if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
-        if (fetchedPublishers && fetchedPublishers.length > 0) setPublishers(fetchedPublishers);
-        if (fetchedNotifs && fetchedNotifs.length > 0) setNotifications(fetchedNotifs);
-      } catch (err) {
-        console.info("Using local master dataset until Supabase credentials are plugged in.");
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadBackendData();
-  }, []);
 
   // Selected State for Modals
   const [selectedJobModal, setSelectedJobModal] = useState<JobOrder | null>(null);
@@ -86,27 +64,123 @@ export default function App() {
   const [selectedYieldJob, setSelectedYieldJob] = useState<JobOrder | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // Check if Publisher client is on Credit Hold
-  const sagoricaPub = publishers.find((p) => p.name === "Sagorica Publications");
-  const isCreditHoldActive = sagoricaPub ? sagoricaPub.creditHoldStatus : false;
-  const overdueJob = jobs.find(
-    (j) => j.publisherName === "Sagorica Publications" && j.paymentStatus === "Overdue"
-  ) || null;
+  // 1. Session Restoration & Auth State Change Listener
+  useEffect(() => {
+    async function restoreSession() {
+      try {
+        const profile = await authService.getCurrentUser();
+        if (profile) {
+          setCurrentUser(profile);
+          setUserRole(profile.role);
+          setIsLoggedIn(true);
+        }
+      } catch (err) {
+        console.info("No active auth session found.");
+      } finally {
+        setIsCheckingSession(false);
+      }
+    }
 
-  // Track specific publisher contact (Shahin vs Chinu)
-  const [publisherContact, setPublisherContact] = useState<"Shahin Ahmed Mithu" | "Abu Sayed Chinu">("Shahin Ahmed Mithu");
+    restoreSession();
 
-  // Toggle Role Action
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === "SIGNED_IN" && session?.user) {
+        const profile = await authService.getCurrentUser();
+        if (profile) {
+          setCurrentUser(profile);
+          setUserRole(profile.role);
+          setIsLoggedIn(true);
+        }
+      } else if (event === "SIGNED_OUT") {
+        setCurrentUser(null);
+        setIsLoggedIn(false);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  // 2. Fetch live master data from Supabase backend on load / login
+  useEffect(() => {
+    async function loadBackendData() {
+      try {
+        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs] = await Promise.all([
+          jobService.fetchJobOrders(),
+          stockService.fetchFilmStock(),
+          publisherService.fetchPublishers(),
+          publisherService.fetchNotifications(),
+        ]);
+
+        if (fetchedJobs && fetchedJobs.length > 0) setJobs(fetchedJobs);
+        if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
+        if (fetchedPublishers && fetchedPublishers.length > 0) setPublishers(fetchedPublishers);
+        if (fetchedNotifs && fetchedNotifs.length > 0) setNotifications(fetchedNotifs);
+      } catch (err) {
+        console.info("Using local master dataset fallback.");
+      }
+    }
+
+    loadBackendData();
+  }, [isLoggedIn]);
+
+  // Handle Login Success from AuthPages
+  const handleLoginSuccess = (profile: UserProfile) => {
+    setCurrentUser(profile);
+    setUserRole(profile.role);
+    setIsLoggedIn(true);
+    setActiveTab("dashboard");
+  };
+
+  // Handle Logout
+  const handleLogout = async () => {
+    try {
+      await authService.signOut();
+    } catch (e) {
+      console.warn("Sign out notice:", e);
+    }
+    setCurrentUser(null);
+    setIsLoggedIn(false);
+    setActiveTab("dashboard");
+  };
+
+  // Toggle Role Action (for testing & demo purposes)
   const handleRoleToggle = () => {
     const nextRole = userRole === "press_owner" ? "publisher" : "press_owner";
     setUserRole(nextRole);
+    if (currentUser) {
+      setCurrentUser({
+        ...currentUser,
+        role: nextRole,
+        businessName: nextRole === "press_owner" ? "Nova Lamination" : "Sagorica Publications",
+      });
+    }
     setActiveTab("dashboard");
   };
+
+  // Dynamic filter: Publisher only sees their own orders; Press Owner sees all orders
+  const visibleJobs = useMemo(() => {
+    if (userRole === "press_owner") return jobs;
+    if (!currentUser) return jobs;
+    const publisherOrders = jobs.filter(
+      (j) => j.publisherName.toLowerCase() === currentUser.businessName.toLowerCase()
+    );
+    // If brand new publisher has no orders yet, return their empty/new list
+    return publisherOrders.length > 0 ? publisherOrders : jobs.filter(j => j.publisherName === "Sagorica Publications");
+  }, [jobs, userRole, currentUser]);
+
+  // Dynamic Credit Hold Status for logged-in Publisher
+  const currentPublisherData = publishers.find(
+    (p) => p.name.toLowerCase() === (currentUser?.businessName || "Sagorica Publications").toLowerCase()
+  );
+  const isCreditHoldActive = currentPublisherData ? currentPublisherData.creditHoldStatus : false;
+  const overdueJob = visibleJobs.find((j) => j.paymentStatus === "Overdue") || null;
 
   // Action: Upload Proof Photo
   const handleUploadProof = (jobId: string, photoUrl: string, note: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = "Md. Abdur Rahim (Press Owner)";
+    const actorName = `${currentUser?.fullName || "Md. Abdur Rahim"} (Press Owner)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -143,7 +217,7 @@ export default function App() {
         id: `notif-${Date.now()}`,
         timestamp: "Just now",
         title: "Proof Uploaded",
-        message: `Nova Lamination uploaded test proof for ${jobId}. Review required.`,
+        message: `${currentUser?.businessName || "Nova Lamination"} uploaded test proof for ${jobId}. Review required.`,
         type: "proof",
         unread: true,
         jobId,
@@ -155,7 +229,7 @@ export default function App() {
   // Action: Approve Proof (Publisher)
   const handleApproveProof = (jobId: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = `${publisherContact} (Publisher)`;
+    const actorName = `${currentUser?.fullName || "Shahin Ahmed Mithu"} (Publisher)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -200,7 +274,7 @@ export default function App() {
   // Action: Reject Proof (Publisher)
   const handleRejectProof = (jobId: string, feedbackNote: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
-    const actorName = `${publisherContact} (Publisher)`;
+    const actorName = `${currentUser?.fullName || "Shahin Ahmed Mithu"} (Publisher)`;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -264,7 +338,6 @@ export default function App() {
       })
     );
 
-    // Sync to Supabase
     if (goodOutput + wasteCount === totalIntake) {
       jobService.verifyYield(jobId, totalIntake, goodOutput, wasteCount).catch((err) => {
         console.warn("Yield verification backend sync notice:", err.message || err);
@@ -344,7 +417,7 @@ export default function App() {
     ]);
   };
 
-
+  // Action: Create New Order
   const handleCreateOrder = (newOrd: {
     bookTitle: string;
     coversCount: number;
@@ -352,13 +425,14 @@ export default function App() {
     dueDate: string;
   }) => {
     const id = `#ORD-0${jobs.length + 10}`;
-    const sessionPublisherName = "Sagorica Publications";
+    const sessionPublisherName = currentUser?.businessName || "Sagorica Publications";
     const sessionPressName = "Nova Lamination";
     const newJob: JobOrder = {
       id,
       bookTitle: newOrd.bookTitle,
       publisherName: sessionPublisherName,
       pressName: sessionPressName,
+      pressOwnerName: "Md. Abdur Rahim",
       coversCount: newOrd.coversCount,
       laminationType: newOrd.laminationType,
       dueDate: newOrd.dueDate,
@@ -392,184 +466,327 @@ export default function App() {
     ]);
   };
 
-
-  if (!isLoggedIn) {
-    return <AuthPages onLoginSuccess={(role) => { setUserRole(role); setIsLoggedIn(true); }} />;
+  // Initial Session Checking Spinner
+  if (isCheckingSession) {
+    return (
+      <div className="min-h-screen bg-[#f1fcf1] flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-[#2e7d46] animate-spin" />
+        <p className="text-xs font-bold text-green-950">Initializing PressPact workspace...</p>
+      </div>
+    );
   }
 
-  const pendingProofsCount = jobs.filter((j) => j.status === "Awaiting Proof").length;
+  // If Not Authenticated, show AuthPages
+  if (!isLoggedIn) {
+    return <AuthPages onLoginSuccess={handleLoginSuccess} />;
+  }
+
+  const pendingProofsCount = visibleJobs.filter((j) => j.status === "Awaiting Proof").length;
   const creditHoldCount = publishers.filter((p) => p.creditHoldStatus).length;
   const lowStockCount = stock.filter((s) => s.availableMeters <= s.minThresholdMeters).length;
 
   const tabTitles: Record<string, string> = {
     dashboard: userRole === "press_owner" ? "Active Jobs Pipeline" : "My Orders Overview",
-    proofs: userRole === "press_owner" ? "Proof Approval Management" : "Proof Approval Center",
+    proofs: userRole === "press_owner" ? "Upload & Manage Proofs" : "Proof Approval Review",
     yield: "Yield & Waste Math Validator",
-    stock: "Material Coverage & Stock Calculator",
-    clients: "Publisher Accounts & Credit Ledger",
-    "new-order": "Submit New Lamination Order",
-    invoices: "Verified Yield Invoices",
-    "credit-status": "Credit & Account Governance Status",
+    stock: "Material Coverage & Inventory",
+    clients: "Publisher Client Directory & Credit",
+    "new-order": "Place New Lamination Order",
+    invoices: "Verified Digital Invoices",
+    "credit-status": "Credit Hold Governance Notice",
   };
 
-  const isPress = userRole === "press_owner";
-
   return (
-    <div className="flex h-screen bg-[#f1fcf1] overflow-hidden text-gray-900 font-sans">
-      {/* Desktop PC Sidebar */}
+    <div className="min-h-screen bg-[#f6fcf6] flex text-gray-900 font-sans antialiased">
+      {/* 1. Desktop Sidebar */}
       <DesktopSidebar
         role={userRole}
+        currentUser={currentUser}
         activeTab={activeTab}
         onTabChange={setActiveTab}
         pendingProofsCount={pendingProofsCount}
         creditHoldCount={creditHoldCount}
         lowStockCount={lowStockCount}
-        onLogout={() => setIsLoggedIn(false)}
+        onLogout={handleLogout}
       />
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top Header */}
+      {/* 2. Main Content Area */}
+      <div className="flex-1 flex flex-col min-w-0">
         <TopHeader
           role={userRole}
+          currentUser={currentUser}
           onRoleToggle={handleRoleToggle}
-          activeTabTitle={tabTitles[activeTab] || "Dashboard"}
+          onLogout={handleLogout}
+          activeTabTitle={tabTitles[activeTab] || "PressPact Portal"}
           notifications={notifications}
           onMarkNotificationsRead={() =>
             setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
           }
           onSelectNotificationJob={(jobId) => {
-            const found = jobs.find((j) => j.id === jobId);
-            if (found) setSelectedJobModal(found);
+            const match = jobs.find((j) => j.id === jobId);
+            if (match) setSelectedJobModal(match);
           }}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
         />
 
-        {/* Scrollable View Container */}
-        <main className="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Press Owner Views */}
-            {isPress && activeTab === "dashboard" && (
-              <PressDashboard
-                jobs={jobs}
-                onSelectJob={setSelectedJobModal}
-                onOpenProof={(job) => { setSelectedProofJob(job); setActiveTab("proofs"); }}
-                onOpenYield={(job) => { setSelectedYieldJob(job); setActiveTab("yield"); }}
-                onNavigateTab={setActiveTab}
-              />
-            )}
+        <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-8">
+          {/* PRESS OWNER VIEWS */}
+          {userRole === "press_owner" && (
+            <>
+              {activeTab === "dashboard" && (
+                <PressDashboard
+                  jobs={jobs}
+                  stock={stock}
+                  publishers={publishers}
+                  onNavigateTab={setActiveTab}
+                  onSelectJob={(job) => setSelectedJobModal(job)}
+                  onOpenProofUpload={(job) => {
+                    setSelectedProofJob(job);
+                    setActiveTab("proofs");
+                  }}
+                  onOpenYieldAudit={(job) => {
+                    setSelectedYieldJob(job);
+                    setActiveTab("yield");
+                  }}
+                  onOpenInvoice={(job) => handleGenerateInvoice(job)}
+                  onContactPublisher={(name, phone) =>
+                    setContactModalData({ isOpen: true, name, phone })
+                  }
+                />
+              )}
 
-            {isPress && activeTab === "proofs" && (
-              <ProofUploadManager
-                jobs={jobs}
-                selectedJob={selectedProofJob}
-                onSelectJob={setSelectedProofJob}
-                onUploadProof={handleUploadProof}
-              />
-            )}
+              {activeTab === "proofs" && (
+                <ProofUploadManager
+                  jobs={jobs}
+                  selectedJob={selectedProofJob}
+                  onSelectJob={setSelectedProofJob}
+                  onUploadProof={handleUploadProof}
+                />
+              )}
 
-            {isPress && activeTab === "yield" && (
-              <YieldValidator
-                jobs={jobs}
-                selectedJob={selectedYieldJob}
-                onSelectJob={setSelectedYieldJob}
-                onUpdateYield={handleUpdateYield}
-                onGenerateInvoice={handleGenerateInvoice}
-              />
-            )}
+              {activeTab === "yield" && (
+                <YieldValidator
+                  jobs={jobs}
+                  selectedJob={selectedYieldJob}
+                  onSelectJob={setSelectedYieldJob}
+                  onVerifyYield={handleUpdateYield}
+                  onGenerateInvoice={handleGenerateInvoice}
+                />
+              )}
 
-            {isPress && activeTab === "stock" && (
-              <MaterialStockManager stock={stock} jobs={jobs} onAddStock={handleAddStock} />
-            )}
+              {activeTab === "stock" && (
+                <MaterialStockManager stock={stock} onAddStock={handleAddStock} />
+              )}
 
-            {isPress && activeTab === "clients" && (
-              <PublisherLedger
-                publishers={publishers}
-                jobs={jobs}
-                onMarkInvoicePaid={handleMarkInvoicePaid}
-                onOpenContact={(name, phone) => setContactModalData({ isOpen: true, name, phone })}
-                onOpenInvoice={setSelectedInvoiceModal}
-              />
-            )}
+              {activeTab === "clients" && (
+                <PublisherLedger
+                  publishers={publishers}
+                  jobs={jobs}
+                  onContact={(name, phone) =>
+                    setContactModalData({ isOpen: true, name, phone })
+                  }
+                />
+              )}
+            </>
+          )}
 
-            {/* Publisher Client Views */}
-            {!isPress && activeTab === "dashboard" && (
-              <PublisherDashboard
-                jobs={jobs}
-                isCreditHold={isCreditHoldActive}
-                overdueJob={overdueJob}
-                onNavigateTab={setActiveTab}
-                onSelectJob={setSelectedJobModal}
-                onOpenProof={(job) => { setSelectedProofJob(job); setActiveTab("proofs"); }}
-                onOpenInvoice={setSelectedInvoiceModal}
-              />
-            )}
+          {/* PUBLISHER CLIENT VIEWS */}
+          {userRole === "publisher" && (
+            <>
+              {activeTab === "dashboard" && (
+                <PublisherDashboard
+                  jobs={visibleJobs}
+                  isCreditHold={isCreditHoldActive}
+                  overdueJob={overdueJob}
+                  onNavigateTab={setActiveTab}
+                  onSelectJob={(job) => setSelectedJobModal(job)}
+                  onOpenProof={(job) => {
+                    setSelectedProofJob(job);
+                    setActiveTab("proofs");
+                  }}
+                  onOpenInvoice={(job) => setSelectedInvoiceModal(job)}
+                />
+              )}
 
-            {!isPress && activeTab === "new-order" && (
-              <NewOrderForm
-                stock={stock}
-                isCreditHold={isCreditHoldActive}
-                overdueJob={overdueJob}
-                onCreateOrder={handleCreateOrder}
-                onOpenCreditHoldNotice={() => setActiveTab("credit-status")}
-              />
-            )}
+              {activeTab === "new-order" && (
+                <NewOrderForm
+                  stock={stock}
+                  isCreditHold={isCreditHoldActive}
+                  onCreateOrder={handleCreateOrder}
+                  onOpenCreditHoldNotice={() => setActiveTab("credit-status")}
+                  overdueJob={overdueJob}
+                />
+              )}
 
-            {!isPress && activeTab === "proofs" && (
-              <ProofApprovalGate
-                jobs={jobs}
-                selectedJob={selectedProofJob}
-                onSelectJob={setSelectedProofJob}
-                onApproveProof={handleApproveProof}
-                onRejectProof={handleRejectProof}
-              />
-            )}
+              {activeTab === "proofs" && (
+                <ProofApprovalGate
+                  jobs={visibleJobs}
+                  selectedJob={selectedProofJob}
+                  onSelectJob={setSelectedProofJob}
+                  onApproveProof={handleApproveProof}
+                  onRejectProof={handleRejectProof}
+                />
+              )}
 
-            {!isPress && activeTab === "invoices" && (
-              <VerifiedInvoiceView jobs={jobs} onOpenInvoice={setSelectedInvoiceModal} />
-            )}
+              {activeTab === "invoices" && (
+                <VerifiedInvoiceView
+                  jobs={visibleJobs.filter((j) => j.status === "Invoiced" || j.status === "Completed")}
+                  onPayInvoice={handleMarkInvoicePaid}
+                  onOpenInvoiceModal={(job) => setSelectedInvoiceModal(job)}
+                />
+              )}
 
-            {!isPress && activeTab === "credit-status" && (
-              <CreditHoldBanner
-                overdueJob={overdueJob}
-                onOpenInvoice={setSelectedInvoiceModal}
-                onOpenContact={() =>
-                  setContactModalData({
-                    isOpen: true,
-                    name: overdueJob
-                      ? `${overdueJob.pressName}${overdueJob.pressOwnerName ? ` (${overdueJob.pressOwnerName})` : ""}`
-                      : "Press Owner",
-                    phone: "+880 1711-456789",
-                  })
-                }
-              />
-            )}
-          </div>
+              {activeTab === "credit-status" && (
+                <CreditHoldBanner
+                  isCreditHold={isCreditHoldActive}
+                  overdueJob={overdueJob}
+                  onPayInvoice={handleMarkInvoicePaid}
+                  onOpenInvoiceModal={(job) => setSelectedInvoiceModal(job)}
+                />
+              )}
+            </>
+          )}
         </main>
+
+        {/* Persistent Bottom Mobile Navigation */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-green-100 px-2 py-2 flex items-center justify-around z-40 shadow-lg">
+          {userRole === "press_owner" ? (
+            <>
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "dashboard" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span>Jobs</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("proofs")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "proofs" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <FileCheck className="w-5 h-5" />
+                <span>Proofs</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("yield")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "yield" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <Calculator className="w-5 h-5" />
+                <span>Yield</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("stock")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "stock" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <Layers className="w-5 h-5" />
+                <span>Stock</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("clients")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "clients" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <Users className="w-5 h-5" />
+                <span>Ledger</span>
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "dashboard" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <LayoutDashboard className="w-5 h-5" />
+                <span>Orders</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("new-order")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "new-order" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <PlusCircle className="w-5 h-5" />
+                <span>New Job</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("proofs")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "proofs" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <FileCheck className="w-5 h-5" />
+                <span>Review</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("invoices")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "invoices" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <Receipt className="w-5 h-5" />
+                <span>Invoices</span>
+              </button>
+              <button
+                onClick={() => setActiveTab("credit-status")}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl text-[10px] font-bold ${
+                  activeTab === "credit-status" ? "text-[#2e7d46]" : "text-gray-500"
+                }`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+                <span>Status</span>
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Global Interactive Modals */}
-      <JobDetailsModal
-        job={selectedJobModal}
-        onClose={() => setSelectedJobModal(null)}
-        onOpenProof={(j) => { setSelectedProofJob(j); setActiveTab("proofs"); }}
-        onOpenYield={isPress ? (j) => { setSelectedYieldJob(j); setActiveTab("yield"); } : undefined}
-        onOpenInvoice={setSelectedInvoiceModal}
-      />
+      {/* Common Modals */}
+      {selectedJobModal && (
+        <JobDetailsModal
+          job={selectedJobModal}
+          onClose={() => setSelectedJobModal(null)}
+          onActionProof={() => {
+            setSelectedProofJob(selectedJobModal);
+            setSelectedJobModal(null);
+            setActiveTab("proofs");
+          }}
+          onActionYield={() => {
+            setSelectedYieldJob(selectedJobModal);
+            setSelectedJobModal(null);
+            setActiveTab("yield");
+          }}
+          onActionInvoice={() => {
+            setSelectedJobModal(null);
+            handleGenerateInvoice(selectedJobModal);
+          }}
+        />
+      )}
 
-      <InvoiceModal
-        job={selectedInvoiceModal}
-        onClose={() => setSelectedInvoiceModal(null)}
-        onMarkPaid={handleMarkInvoicePaid}
-        isPressOwner={isPress}
-      />
+      {selectedInvoiceModal && (
+        <InvoiceModal
+          job={selectedInvoiceModal}
+          onClose={() => setSelectedInvoiceModal(null)}
+          onPayInvoice={(id) => handleMarkInvoicePaid(id)}
+        />
+      )}
 
-      <ContactModal
-        isOpen={contactModalData.isOpen}
-        onClose={() => setContactModalData({ isOpen: false })}
-        targetName={contactModalData.name}
-        phone={contactModalData.phone}
-      />
+      {contactModalData.isOpen && (
+        <ContactModal
+          name={contactModalData.name || "Contact"}
+          phone={contactModalData.phone || "+880 1711-000000"}
+          onClose={() => setContactModalData({ isOpen: false })}
+        />
+      )}
     </div>
   );
 }
