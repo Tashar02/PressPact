@@ -36,6 +36,7 @@ import { CreditHoldBanner } from "./components/publisher/CreditHoldBanner";
 import { JobDetailsModal } from "./components/common/JobDetailsModal";
 import { ContactModal } from "./components/common/ContactModal";
 import { InvoiceModal } from "./components/common/InvoiceModal";
+import { DebugOverlay } from "./components/common/DebugOverlay";
 import { X, Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function App() {
@@ -918,6 +919,9 @@ export default function App() {
           onClose={() => setContactModalData({ isOpen: false })}
         />
       )}
+
+      {/* Floating Debug overlay logger */}
+      <DebugOverlay />
     </div>
   );
 }
