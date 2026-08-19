@@ -194,7 +194,6 @@ export default function App() {
       setCurrentUser({
         ...currentUser,
         role: nextRole,
-        businessName: nextRole === "press_owner" ? "Nova Lamination" : "Sagorica Publications",
       });
     }
     setActiveTab("dashboard");
@@ -217,6 +216,29 @@ export default function App() {
       (j) => j.publisherName.toLowerCase() === userBusinessName
     );
   }, [jobs, userRole, currentUser]);
+
+  // Dynamic filter: Users only see publishers relevant to their business
+  const visiblePublishers = useMemo(() => {
+    if (!currentUser) return [];
+    const userBusinessName = currentUser.businessName.toLowerCase();
+
+    if (userRole === "press_owner") {
+      // If demo seed press Nova Lamination, show all publishers.
+      // Otherwise, only show publishers who have placed orders with this specific press.
+      if (userBusinessName === "nova lamination") {
+        return publishers;
+      }
+      const relevantPublisherNames = new Set(
+        visibleJobs.map((j) => j.publisherName.toLowerCase())
+      );
+      return publishers.filter((p) => relevantPublisherNames.has(p.name.toLowerCase()));
+    }
+
+    // Publisher only sees their own publisher entry
+    return publishers.filter(
+      (p) => p.name.toLowerCase() === userBusinessName
+    );
+  }, [publishers, visibleJobs, userRole, currentUser]);
 
   // Dynamic filter: Users only see notifications related to their own jobs/actions
   const visibleNotifications = useMemo(() => {
@@ -575,7 +597,7 @@ export default function App() {
       bookTitle: newOrd.bookTitle,
       publisherName: sessionPublisherName,
       pressName: sessionPressName,
-      pressOwnerName: "Md. Abdur Rahim",
+      pressOwnerName: "Authorized Press Signatory",
       coversCount: newOrd.coversCount,
       laminationType: newOrd.laminationType,
       dueDate: newOrd.dueDate,
@@ -633,7 +655,7 @@ export default function App() {
   }
 
   const pendingProofsCount = visibleJobs.filter((j) => j.status === "Awaiting Proof").length;
-  const creditHoldCount = publishers.filter((p) => p.creditHoldStatus).length;
+  const creditHoldCount = visiblePublishers.filter((p) => p.creditHoldStatus).length;
   const lowStockCount = stock.filter((s) => s.availableMeters <= s.minThresholdMeters).length;
 
   const tabTitles: Record<string, string> = {
@@ -674,7 +696,7 @@ export default function App() {
             setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
           }
           onSelectNotificationJob={(jobId) => {
-            const match = jobs.find((j) => j.id === jobId);
+            const match = visibleJobs.find((j) => j.id === jobId);
             if (match) setSelectedJobModal(match);
           }}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -686,9 +708,9 @@ export default function App() {
             <>
               {activeTab === "dashboard" && (
                 <PressDashboard
-                  jobs={jobs}
+                  jobs={visibleJobs}
                   stock={stock}
-                  publishers={publishers}
+                  publishers={visiblePublishers}
                   onNavigateTab={setActiveTab}
                   onSelectJob={(job) => setSelectedJobModal(job)}
                   onOpenProofUpload={(job) => {
@@ -708,7 +730,7 @@ export default function App() {
 
               {activeTab === "proofs" && (
                 <ProofUploadManager
-                  jobs={jobs}
+                  jobs={visibleJobs}
                   selectedJob={selectedProofJob}
                   onSelectJob={setSelectedProofJob}
                   onUploadProof={handleUploadProof}
@@ -717,7 +739,7 @@ export default function App() {
 
               {activeTab === "yield" && (
                 <YieldValidator
-                  jobs={jobs}
+                  jobs={visibleJobs}
                   selectedJob={selectedYieldJob}
                   onSelectJob={setSelectedYieldJob}
                   onVerifyYield={handleUpdateYield}
@@ -726,13 +748,13 @@ export default function App() {
               )}
 
               {activeTab === "stock" && (
-                <MaterialStockManager stock={stock} jobs={jobs} onAddStock={handleAddStock} />
+                <MaterialStockManager stock={stock} jobs={visibleJobs} onAddStock={handleAddStock} />
               )}
 
               {activeTab === "clients" && (
                 <PublisherLedger
-                  publishers={publishers}
-                  jobs={jobs}
+                  publishers={visiblePublishers}
+                  jobs={visibleJobs}
                   onContact={(name, phone) =>
                     setContactModalData({ isOpen: true, name, phone })
                   }

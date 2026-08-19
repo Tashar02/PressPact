@@ -86,7 +86,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
       {submittedSuccess && (
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-[#2e7d46]" />
-          Order successfully submitted! Nova Lamination has been notified to produce test proof.
+          Order successfully submitted! The press has been notified to produce test proof.
         </div>
       )}
 
@@ -228,7 +228,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                 }`}
               >
                 <Send className="w-4 h-4" />
-                Submit Order to Nova Lamination
+                Submit Order for Production
               </button>
             </form>
           </div>

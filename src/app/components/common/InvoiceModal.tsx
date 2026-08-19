@@ -77,16 +77,14 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           <div>
             <p className="font-bold text-gray-400 uppercase tracking-wider mb-1">Issued By (Press)</p>
             <p className="font-bold text-green-950 text-sm">{job.pressName}</p>
-            <p className="text-gray-600">Md. Abdur Rahim</p>
-            <p className="text-gray-500">38/2 Banglabazar, Dhaka, Bangladesh</p>
+            <p className="text-gray-600">{job.pressOwnerName || "Authorized Press Signatory"}</p>
+            <p className="text-gray-500">Dhaka, Bangladesh</p>
           </div>
           <div>
             <p className="font-bold text-gray-400 uppercase tracking-wider mb-1">Billed To (Publisher)</p>
             <p className="font-bold text-green-950 text-sm">{job.publisherName}</p>
-            <p className="text-gray-600">
-              {job.id === "#ORD-008" ? "Shahin Ahmed Mithu" : "Abu Sayed Chinu"}
-            </p>
-            <p className="text-gray-500">Sagorica Publications, Banglabazar, Dhaka, Bangladesh</p>
+            <p className="text-gray-600">{job.publisherName}</p>
+            <p className="text-gray-500">Dhaka, Bangladesh</p>
           </div>
         </div>
 

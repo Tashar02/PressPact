@@ -11,8 +11,8 @@ interface ContactModalProps {
 export const ContactModal: React.FC<ContactModalProps> = ({
   isOpen,
   onClose,
-  targetName = "Nova Lamination (Md. Abdur Rahim)",
-  phone = "+880 1711-456789",
+  targetName = "Workspace Support",
+  phone = "+880 1700-000000",
 }) => {
   const [copied, setCopied] = React.useState(false);
 

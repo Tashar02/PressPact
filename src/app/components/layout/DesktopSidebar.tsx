@@ -107,8 +107,8 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
   const menuItems = isPress ? pressMenuItems : publisherMenuItems;
 
   // Compute display initials
-  const displayName = currentUser?.fullName || (isPress ? "Md. Abdur Rahim" : "Shahin Ahmed Mithu");
-  const displayBusiness = currentUser?.businessName || (isPress ? "Nova Lamination (Press)" : "Sagorica Publications");
+  const displayName = currentUser?.fullName || (isPress ? "Press Owner" : "Publisher");
+  const displayBusiness = currentUser?.businessName || (isPress ? "Press Workspace" : "Publisher Workspace");
   const initials = displayName
     .split(" ")
     .map((n) => n[0])

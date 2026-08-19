@@ -41,8 +41,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const unreadCount = notifications.filter((n) => n.unread).length;
   const isPress = role === "press_owner";
 
-  const displayName = currentUser?.fullName || (isPress ? "Md. Abdur Rahim" : "Shahin Ahmed Mithu");
-  const displayBusiness = currentUser?.businessName || (isPress ? "Nova Lamination" : "Sagorica Publications");
+  const displayName = currentUser?.fullName || (isPress ? "Press Owner" : "Publisher");
+  const displayBusiness = currentUser?.businessName || (isPress ? "Press Workspace" : "Publisher Workspace");
 
   return (
     <header className="sticky top-0 z-30 bg-white/90 backdrop-blur-md border-b border-green-100 px-4 lg:px-6 py-3 flex items-center justify-between gap-4 shadow-xs">
