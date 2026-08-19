@@ -1,5 +1,15 @@
 export type UserRole = "press_owner" | "publisher";
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  role: UserRole;
+  fullName: string;
+  businessName: string;
+  phone?: string;
+  location?: string;
+}
+
 export type JobStatus =
   | "Order Placed"
   | "Awaiting Proof"
