@@ -205,13 +205,21 @@ export default function App() {
     setActiveTab("dashboard");
   };
 
-  // Dynamic filter: Publisher only sees their own orders; Press Owner sees all orders
+  // Dynamic filter: Users only see jobs matching their respective business name
   const visibleJobs = useMemo(() => {
-    if (userRole === "press_owner") return jobs;
     if (!currentUser) return [];
-    // Show only this publisher's own orders — new publishers start with an empty list
+    const userBusinessName = currentUser.businessName.toLowerCase();
+
+    if (userRole === "press_owner") {
+      // Show only jobs matching this Press Owner's press name
+      return jobs.filter(
+        (j) => j.pressName.toLowerCase() === userBusinessName
+      );
+    }
+
+    // Show only jobs matching this Publisher's publisher name
     return jobs.filter(
-      (j) => j.publisherName.toLowerCase() === currentUser.businessName.toLowerCase()
+      (j) => j.publisherName.toLowerCase() === userBusinessName
     );
   }, [jobs, userRole, currentUser]);
 
