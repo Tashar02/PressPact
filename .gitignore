@@ -1,3 +1,17 @@
 SRS*
 low-fidelity/
 high-fidelity/
+
+# Environment files
+.env
+.env.local
+.env*.local
+
+# Dependencies & Build output
+node_modules/
+dist/
+.vercel/
+
+# System & editor files
+.DS_Store
+*.log
