@@ -113,10 +113,18 @@ export default function App() {
           publisherService.fetchNotifications(),
         ]);
 
-        if (fetchedJobs && fetchedJobs.length > 0) setJobs(fetchedJobs);
+        const resolvedJobs = (fetchedJobs && fetchedJobs.length > 0) ? fetchedJobs : null;
+        const resolvedPublishers = (fetchedPublishers && fetchedPublishers.length > 0) ? fetchedPublishers : null;
+
+        if (resolvedJobs) setJobs(resolvedJobs);
         if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
-        if (fetchedPublishers && fetchedPublishers.length > 0) setPublishers(fetchedPublishers);
+        if (resolvedPublishers) setPublishers(resolvedPublishers);
         if (fetchedNotifs && fetchedNotifs.length > 0) setNotifications(fetchedNotifs);
+
+        // Real-time credit hold: check right now, not on a nightly cron.
+        if (resolvedJobs && resolvedPublishers) {
+          await checkAndApplyCreditHolds(resolvedJobs, resolvedPublishers);
+        }
       } catch (err) {
         console.info("Using local master dataset fallback.");
       }
@@ -124,6 +132,44 @@ export default function App() {
 
     loadBackendData();
   }, [isLoggedIn]);
+
+  /**
+   * Dynamically calculates whether each publisher should be on credit hold
+   * based on whether they have any Unpaid invoice whose due date is more than
+   * 30 days in the past — checked right now, at load time.
+   * Updates the DB and local state only when the status has actually changed.
+   */
+  async function checkAndApplyCreditHolds(
+    currentJobs: JobOrder[],
+    currentPublishers: PublisherClient[]
+  ) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    for (const pub of currentPublishers) {
+      const hasOverdueInvoice = currentJobs.some((j) => {
+        if (j.publisherName.toLowerCase() !== pub.name.toLowerCase()) return false;
+        if (j.paymentStatus !== "Unpaid") return false;
+        if (!j.invoiceDueDate) return false;
+        const due = new Date(j.invoiceDueDate);
+        const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+        return diffDays > 30;
+      });
+
+      // Only touch the DB if the status has actually changed
+      if (hasOverdueInvoice !== pub.creditHoldStatus) {
+        setPublishers((prev) =>
+          prev.map((p) =>
+            p.id === pub.id ? { ...p, creditHoldStatus: hasOverdueInvoice } : p
+          )
+        );
+        publisherService.setCreditHold(pub.id, hasOverdueInvoice).catch((err) => {
+          console.warn("Credit hold auto-sync notice:", err.message || err);
+        });
+      }
+    }
+  }
+
 
   // Handle Login Success from AuthPages
   const handleLoginSuccess = (profile: UserProfile) => {
@@ -174,7 +220,18 @@ export default function App() {
     ? publishers.find((p) => p.name.toLowerCase() === currentUser.businessName.toLowerCase())
     : undefined;
   const isCreditHoldActive = currentPublisherData?.creditHoldStatus ?? false;
-  const overdueJob = visibleJobs.find((j) => j.paymentStatus === "Overdue") || null;
+  // Find the triggering overdue job dynamically: unpaid, has a due date, and is 30+ days past it
+  const overdueJob = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return visibleJobs.find((j) => {
+      if (j.paymentStatus !== "Unpaid") return false;
+      if (!j.invoiceDueDate) return false;
+      const due = new Date(j.invoiceDueDate);
+      const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+      return diffDays > 30;
+    }) || null;
+  }, [visibleJobs]);
 
   // Action: Upload Proof Photo
   const handleUploadProof = (jobId: string, photoUrl: string, note: string) => {
@@ -345,6 +402,10 @@ export default function App() {
   const handleGenerateInvoice = (job: JobOrder) => {
     const invoiceId = job.invoiceId || `INV-${new Date().getFullYear()}-${job.id.replace('#ORD-', '')}`;
     const amountBdt = job.amountBdt ?? Math.round(job.coversCount * 12);
+    // Due date = 30 days from today — needed for real-time credit hold calculation
+    const dueDate = new Date();
+    dueDate.setDate(dueDate.getDate() + 30);
+    const invoiceDueDate = dueDate.toISOString().split("T")[0];
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -355,15 +416,16 @@ export default function App() {
             paymentStatus: j.paymentStatus || ("Unpaid" as const),
             invoiceId,
             amountBdt,
+            invoiceDueDate,
           };
         }
         return j;
       })
     );
-    setSelectedInvoiceModal({ ...job, status: "Invoiced", invoiceId, amountBdt });
+    setSelectedInvoiceModal({ ...job, status: "Invoiced", invoiceId, amountBdt, invoiceDueDate });
 
-    // Persist invoice to Supabase
-    jobService.generateInvoice(job.id, invoiceId, amountBdt).catch((err) => {
+    // Persist invoice to Supabase (including due date)
+    jobService.generateInvoice(job.id, invoiceId, amountBdt, invoiceDueDate).catch((err) => {
       console.warn("Invoice generation backend sync notice:", err.message || err);
     });
 
