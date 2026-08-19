@@ -8,10 +8,7 @@ import {
   NotificationItem,
 } from "./types";
 import {
-  INITIAL_JOBS,
   INITIAL_STOCK,
-  INITIAL_PUBLISHERS,
-  INITIAL_NOTIFICATIONS,
 } from "./mockData";
 import { supabase } from "./lib/supabase";
 import { authService } from "./services/authService";
@@ -47,10 +44,10 @@ export default function App() {
   const [isCheckingSession, setIsCheckingSession] = useState<boolean>(true);
 
   // App Master Data State
-  const [jobs, setJobs] = useState<JobOrder[]>(INITIAL_JOBS);
+  const [jobs, setJobs] = useState<JobOrder[]>([]);
   const [stock, setStock] = useState<FilmStockItem[]>(INITIAL_STOCK);
-  const [publishers, setPublishers] = useState<PublisherClient[]>(INITIAL_PUBLISHERS);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(INITIAL_NOTIFICATIONS);
+  const [publishers, setPublishers] = useState<PublisherClient[]>([]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Selected State for Modals
   const [selectedJobModal, setSelectedJobModal] = useState<JobOrder | null>(null);
