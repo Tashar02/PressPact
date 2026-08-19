@@ -11,6 +11,7 @@ high-fidelity/
 node_modules/
 dist/
 .vercel/
+graphify-out/
 
 # System & editor files
 .DS_Store
