@@ -71,6 +71,12 @@ export const authService = {
     // We still write the profile row but tell the caller confirmation is needed.
     const needsEmailConfirmation = !data.session;
 
+    // To prevent auto-login behavior (Supabase automatically signs in on signup if confirm email is off),
+    // we explicitly sign out to keep the user on the login tab.
+    if (data.session) {
+      await supabase.auth.signOut();
+    }
+
     // Ensure profile and publisher records are inserted
     try {
       await supabase.from("profiles").upsert({
