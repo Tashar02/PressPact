@@ -836,26 +836,27 @@ export default function App() {
       newOrd.pressName || presses.find((p) => p.toLowerCase() === "nova lamination") || "Nova Lamination";
     const matchPub = publishers.find((p) => p.name === sessionPublisherName);
     const nowIso = new Date().toISOString();
-    const newJob: JobOrder = {
-      id,
-      bookTitle: newOrd.bookTitle,
-      publisherId: matchPub?.id,
-      publisherName: sessionPublisherName,
-      pressName: sessionPressName,
-      coversCount: newOrd.coversCount,
-      laminationType: newOrd.laminationType,
-      dueDate: newOrd.dueDate,
-      orderDate: nowIso.split("T")[0],
-      createdAt: nowIso,
-      status: "Order Placed",
-      estimatedFilmMeters: estimateFilmMeters(newOrd.coversCount),
-      proofLogs: [],
-      coverSupply: newOrd.coverSupply,
-      coverType: newOrd.coverType,
-      coverStatus: newOrd.coverStatus,
-      coverRequestPriceBdt: newOrd.coverRequestPriceBdt,
-      coverPriceBdt: newOrd.coverPriceBdt,
-    };
+const newJob: JobOrder = {
+       id,
+       bookTitle: newOrd.bookTitle,
+       publisherId: matchPub?.id,
+       publisherName: sessionPublisherName,
+       pressName: sessionPressName,
+       pressOwnerName: currentUser?.fullName || "",
+       coversCount: newOrd.coversCount,
+       laminationType: newOrd.laminationType,
+       dueDate: newOrd.dueDate,
+       orderDate: nowIso.split("T")[0],
+       createdAt: nowIso,
+       status: "Order Placed",
+       estimatedFilmMeters: estimateFilmMeters(newOrd.coversCount),
+       proofLogs: [],
+       coverSupply: newOrd.coverSupply,
+       coverType: newOrd.coverType,
+       coverStatus: newOrd.coverStatus,
+       coverRequestPriceBdt: newOrd.coverRequestPriceBdt,
+       coverPriceBdt: newOrd.coverPriceBdt,
+     };
 
     setJobs((prev) => [newJob, ...prev]);
 

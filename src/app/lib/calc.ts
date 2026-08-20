@@ -57,11 +57,17 @@ export function formatTimeBn(date: Date): string {
  * local timezone. Falls back to DD-MM-YYYY for date-only values.
  */
 export function formatDateTimeBn(iso: string): string {
-  if (!iso) return "";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return formatDateBn(iso);
-  const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
-    date.getDate()
-  ).padStart(2, "0")}`;
-  return `${formatDateBn(localDate)}, ${formatTimeBn(date)}`;
+   if (!iso) return "";
+   // Check if this is a date-only value (YYYY-MM-DD format)
+   const dateOnlyMatch = iso.match(/^\d{4}-\d{2}-\d{2}$/);
+   if (dateOnlyMatch) {
+      // For date-only values, just format as date without time
+      return formatDateBn(iso);
+   }
+   const date = new Date(iso);
+   if (Number.isNaN(date.getTime())) return formatDateBn(iso);
+   const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate()
+   ).padStart(2, "0")}`;
+   return `${formatDateBn(localDate)}, ${formatTimeBn(date)}`;
 }

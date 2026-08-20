@@ -65,6 +65,11 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   const [coverRequestName, setCoverRequestName] = useState("");
   const [coverRequestPrice, setCoverRequestPrice] = useState<number>(0);
   const pressCoverTypes = coverTypes.filter((c) => c.pressName === pressName);
+  
+  // Auto-enable request mode when press has no configured cover types
+  if (pressCoverTypes.length === 0 && coverSupply === "press_purchased" && !coverRequestMode) {
+    setCoverRequestMode(true);
+  }
   const selectedCoverType = pressCoverTypes.find((c) => c.name === coverType);
   const coverRequested = coverSupply === "press_purchased" && coverRequestMode;
 
@@ -394,14 +399,36 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                           </div>
                         )}
                       </>
-                    ) : (
-                      <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-1.5">
-                        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-                        <span>
-                          {pressName} has not listed any cover types. You can still request one below and offer a per-cover price — the press will accept or decline.
-                        </span>
-                      </div>
-                    )}
+) : (
+                       <>
+                         <div className="space-y-2 pt-1">
+                           <div className="space-y-1">
+                             <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                               Cover Type Name
+                             </label>
+                             <input
+                               type="text"
+                               value={coverTypeName}
+                               onChange={(e) => setCoverTypeName(e.target.value)}
+                               className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                             />
+                           </div>
+                           <div className="space-y-1">
+                             <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                               Offered Price (BDT per cover)
+                             </label>
+                             <input
+                               type="number"
+                               value={offeredPriceBdt}
+                               min={0}
+                               step={0.01}
+                               onChange={(e) => setOfferedPriceBdt(Number(e.target.value) || 0)}
+                               className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                             />
+                           </div>
+                         </div>
+                       </>
+                     )}
 
                     {coverRequestMode && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

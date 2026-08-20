@@ -12,6 +12,7 @@ import {
   Camera,
   Loader2,
 } from "lucide-react";
+import { formatDateTimeBn } from "../../lib/calc";
 
 interface ProofUploadManagerProps {
   jobs: JobOrder[];
@@ -70,22 +71,23 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 
     setIsUploading(true);
     setErrorMessage(null);
-    let finalUrls: string[] = photoUrls;
-
-    try {
-      if (selectedFiles.length > 0) {
-        finalUrls = await jobService.uploadProofImageFiles(selectedFiles, currentJob.id);
+let finalUrls: string[] = photoUrls.filter((url) => !url.startsWith("blob:"));
+      
+      try {
+        if (selectedFiles.length > 0) {
+          const uploadedUrls = await jobService.uploadProofImageFiles(selectedFiles, currentJob.id);
+          finalUrls = [...finalUrls, ...uploadedUrls];
+        }
+        onUploadProof(currentJob.id, finalUrls, note);
+        setSelectedFiles([]);
+        setIsSuccessToast(true);
+        setTimeout(() => setIsSuccessToast(false), 4000);
+      } catch (err) {
+        console.error("Proof submission error:", err);
+        setErrorMessage(err instanceof Error ? err.message : "Proof upload failed. Please try again.");
+      } finally {
+        setIsUploading(false);
       }
-      onUploadProof(currentJob.id, finalUrls, note);
-      setSelectedFiles([]);
-      setIsSuccessToast(true);
-      setTimeout(() => setIsSuccessToast(false), 4000);
-    } catch (err) {
-      console.error("Proof submission error:", err);
-      setErrorMessage(err instanceof Error ? err.message : "Proof upload failed. Please try again.");
-    } finally {
-      setIsUploading(false);
-    }
   };
 
   return (
@@ -354,7 +356,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                           {log.action === "uploaded" && <Clock className="w-4 h-4 text-amber-600" />}
                           {log.actor} ({log.role === "press_owner" ? "Press" : "Publisher"})
                         </span>
-                        <span className="text-[10px] font-mono text-gray-500">{log.timestamp}</span>
+                        <span className="text-[10px] font-mono text-gray-500">{formatDateTimeBn(log.timestamp)}</span>
                       </div>
                       {log.note && <p className="italic text-gray-700 bg-white/80 p-2 rounded-lg border border-gray-100">"{log.note}"</p>}
                     </div>

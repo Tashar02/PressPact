@@ -53,12 +53,12 @@ INSERT INTO job_orders (
     'Sagorica Publications',
     'Green Print Lamination',
     'Dummy Press Owner',
-    2000,
-    'Matte 30μm',
-    'Aug 10, 2026',
-    'Jul 20, 2026',
-    'Invoiced',
-    1400.00,
+2000,
+       'Matte 30μm',
+       '2026-08-10',
+       '2026-07-20',
+       'Invoiced',
+       1400.00,
     'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10',
     'Applied Matte finish sample run (2 test covers). Please verify edge pasting & color depth.',
     2000, 1950, 50, TRUE,
@@ -72,12 +72,12 @@ INSERT INTO job_orders (
     'Sagorica Publications',
     'Green Print Lamination',
     'Dummy Press Owner',
-    1500,
-    'Gloss 24μm',
-    'Aug 05, 2026',
-    'Jul 15, 2026',
-    'In Production',
-    1050.00,
+1500,
+       'Gloss 24μm',
+       '2026-08-05',
+       '2026-07-15',
+       'In Production',
+       1050.00,
     'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10',
     'Gloss 24μm sample approved by publisher.',
     NULL, NULL, NULL, FALSE,
@@ -102,7 +102,7 @@ INSERT INTO proof_logs (job_id, timestamp, action, actor, role, note, photo_url)
 -- 4b. Insert Initial Business Logs (binding audit trail)
 INSERT INTO business_logs (job_id, timestamp, actor, role, action, note) VALUES
 ('#ORD-00000001', '2026-07-20 11:00:00+06', 'Dummy Publisher', 'publisher', 'order_placed', 'Order placed with covers supplied by the client (client_supplied).'),
-('#ORD-00000001', '2026-06-18 15:00:00+06', 'Dummy Press Owner', 'press_owner', 'invoice_issued', 'Invoice INV-2026-00000001 issued for BDT 48,750.');
+('#ORD-00000001', '2026-07-20 12:00:00+06', 'Dummy Press Owner', 'press_owner', 'invoice_issued', 'Invoice INV-2026-00000001 issued for BDT 48,750.');
 
 -- 5. Insert Initial Notifications
 INSERT INTO notifications (timestamp, title, message, type, unread, job_id) VALUES

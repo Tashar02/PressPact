@@ -150,24 +150,25 @@ export const jobService = {
    * Create a new job order in Supabase
    */
   async createJobOrder(order: Omit<JobOrder, "proofLogs">): Promise<JobOrder> {
-    const dbRow = {
-      id: order.id,
-      book_title: order.bookTitle,
-      publisher_id: order.publisherId || null,
-      publisher_name: order.publisherName,
-      press_name: order.pressName,
-      covers_count: order.coversCount,
-      lamination_type: order.laminationType,
-      due_date: order.dueDate,
-      order_date: order.orderDate,
-      status: order.status,
-      estimated_film_meters: order.estimatedFilmMeters,
-      cover_supply: order.coverSupply || null,
-      cover_type: order.coverType || null,
-      cover_status: order.coverStatus || null,
-      cover_request_price_bdt: order.coverRequestPriceBdt ?? null,
-      cover_price_bdt: order.coverPriceBdt ?? null,
-    };
+const dbRow = {
+       id: order.id,
+       book_title: order.bookTitle,
+       publisher_id: order.publisherId || null,
+       publisher_name: order.publisherName,
+       press_name: order.pressName,
+       press_owner_name: order.pressOwnerName ?? null,
+       covers_count: order.coversCount,
+       lamination_type: order.laminationType,
+       due_date: order.dueDate,
+       order_date: order.orderDate,
+       status: order.status,
+       estimated_film_meters: order.estimatedFilmMeters,
+       cover_supply: order.coverSupply || null,
+       cover_type: order.coverType || null,
+       cover_status: order.coverStatus || null,
+       cover_request_price_bdt: order.coverRequestPriceBdt ?? null,
+       cover_price_bdt: order.coverPriceBdt ?? null,
+     };
 
     const { data, error } = await supabase
       .from("job_orders")
@@ -358,9 +359,30 @@ export const jobService = {
    * they open the invoice.
    */
   async sendPaymentMessage(jobId: string, note: string, photoUrl?: string): Promise<void> {
+    // Fetch current job to preserve existing payment_note_photo_url if not overwritten
+    const { data: job, error: fetchError } = await supabase
+      .from("job_orders")
+      .select("payment_note_photo_url")
+      .eq("id", jobId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const updateObj: any = {
+      payment_note: note,
+    };
+
+    // Only overwrite payment_note_photo_url if a new photo is provided; otherwise keep existing
+    if (photoUrl !== undefined) {
+      updateObj.payment_note_photo_url = photoUrl;
+    } else {
+      // Preserve existing value
+      updateObj.payment_note_photo_url = job.payment_note_photo_url;
+    }
+
     const { error } = await supabase
       .from("job_orders")
-      .update({ payment_note: note, payment_note_photo_url: photoUrl || null })
+      .update(updateObj)
       .eq("id", jobId);
 
     if (error) throw error;
