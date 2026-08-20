@@ -9,6 +9,7 @@ import {
   FileText,
   ShieldAlert,
   LogOut,
+  Package,
 } from "lucide-react";
 
 interface TopHeaderProps {
@@ -143,6 +144,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                         {notif.type === "credit" && <ShieldAlert className="w-4 h-4 text-red-600" />}
                         {notif.type === "stock" && <AlertCircle className="w-4 h-4 text-orange-500" />}
                         {notif.type === "yield" && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+                        {notif.type === "cover" && <Package className="w-4 h-4 text-indigo-500" />}
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center justify-between">

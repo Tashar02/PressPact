@@ -1,6 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
-import { formatDateBn } from "../../lib/calc";
+import { formatDateBn, formatDateTimeBn } from "../../lib/calc";
 import {
   X,
   BookOpen,
@@ -51,9 +51,9 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
     },
   ];
 
-  // Yield audit is available once production starts; the auditor is where the
-  // press records output figures before issuing the invoice.
-  const yieldReady = ["In Production", "Yield Audit Pending", "Invoiced", "Completed"].includes(job.status);
+  // Yield audit is available once production starts; once invoiced the yield
+  // figures are frozen and the press doesn't need the math auditor anymore.
+  const yieldReady = ["In Production", "Yield Audit Pending"].includes(job.status);
   // Invoice button available when already invoiced
   const isInvoiced = ["Invoiced", "Completed"].includes(job.status);
 
@@ -151,12 +151,86 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
               <span className="text-gray-600">Publisher:</span>
               <span className="font-bold text-gray-900">{job.publisherName}</span>
             </div>
+            <div className="flex justify-between py-1 border-b border-gray-200/60">
+              <span className="text-gray-600">Order Received:</span>
+              <span className="font-bold text-gray-900">
+                {formatDateTimeBn(job.createdAt || job.orderDate) || "—"}
+              </span>
+            </div>
             <div className="flex justify-between py-1">
               <span className="text-gray-600">Delivery Due:</span>
               <span className="font-bold text-amber-700">{formatDateBn(job.dueDate)}</span>
             </div>
           </div>
         </div>
+
+        {/* Cover Supply Details */}
+        {job.coverSupply && (
+          <div className="p-3 bg-indigo-50/40 rounded-xl border border-indigo-100 text-xs space-y-2">
+            <p className="font-bold text-indigo-800 uppercase tracking-wider">Cover Supply</p>
+            <div className="flex justify-between py-1 border-b border-indigo-100">
+              <span className="text-gray-600">Option:</span>
+              <span className="font-bold text-gray-900">
+                {job.coverSupply === "client_supplied" ? "Client Supplies Covers" : "Press Purchases Covers"}
+              </span>
+            </div>
+            {job.coverType && (
+              <div className="flex justify-between py-1 border-b border-indigo-100">
+                <span className="text-gray-600">Cover Type:</span>
+                <span className="font-bold text-gray-900">{job.coverType}</span>
+              </div>
+            )}
+            {job.coverStatus === "requested" && (
+              <div className="flex justify-between py-1">
+                <span className="text-gray-600">Request:</span>
+                <span className="font-bold text-amber-800">
+                  Pending press approval at BDT {(job.coverRequestPriceBdt ?? 0).toLocaleString()}/cover
+                </span>
+              </div>
+            )}
+            {job.coverStatus === "approved" && (
+              <div className="flex justify-between py-1">
+                <span className="text-gray-600">Approved:</span>
+                <span className="font-bold text-emerald-800">
+                  BDT {(job.coverPriceBdt ?? 0).toLocaleString()}/cover
+                </span>
+              </div>
+            )}
+            {job.coverStatus === "rejected" && (
+              <div className="flex justify-between py-1">
+                <span className="text-gray-600">Decision:</span>
+                <span className="font-bold text-red-700">
+                  Declined by press — order kept on record
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Business Log (Books) Audit Trail */}
+        {job.businessLogs && job.businessLogs.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold text-gray-700 uppercase tracking-wider">
+              Business Log (Books) — Binding Record
+            </p>
+            <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar">
+              {job.businessLogs.map((log) => (
+                <div key={log.id} className="p-3 bg-indigo-50/30 rounded-xl border border-indigo-100 text-xs flex justify-between items-start">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900">{log.actor}</span>
+                      <span className="text-[10px] font-bold uppercase px-1.5 py-0.2 rounded bg-indigo-100 text-indigo-800">
+                        {log.action.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    {log.note && <p className="text-gray-700 mt-1 italic">"{log.note}"</p>}
+                  </div>
+                  <span className="text-[10px] text-gray-400 font-mono">{formatDateTimeBn(log.timestamp)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Proof Log Audit Trail */}
         {job.proofLogs && job.proofLogs.length > 0 && (
@@ -176,7 +250,7 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
                     </div>
                     {log.note && <p className="text-gray-700 mt-1 italic">"{log.note}"</p>}
                   </div>
-                  <span className="text-[10px] text-gray-400 font-mono">{log.timestamp}</span>
+                  <span className="text-[10px] text-gray-400 font-mono">{formatDateTimeBn(log.timestamp)}</span>
                 </div>
               ))}
             </div>
