@@ -983,8 +983,8 @@ export default function App() {
         />
       )}
 
-      {/* Floating Debug overlay logger */}
-      <DebugOverlay />
+      {/* Floating Debug overlay logger — dev builds only */}
+      {import.meta.env.DEV && <DebugOverlay />}
     </div>
   );
 }

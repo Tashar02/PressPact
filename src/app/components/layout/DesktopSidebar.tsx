@@ -12,6 +12,7 @@ import {
   LogOut,
   Sparkles,
   BookOpen,
+  type LucideIcon,
 } from "lucide-react";
 
 interface DesktopSidebarProps {
@@ -23,6 +24,15 @@ interface DesktopSidebarProps {
   creditHoldCount: number;
   lowStockCount: number;
   onLogout: () => void;
+}
+
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: LucideIcon;
+  badge?: string | number;
+  badgeColor?: string;
+  highlight?: boolean;
 }
 
 export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
@@ -37,7 +47,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
 }) => {
   const isPress = role === "press_owner";
 
-  const pressMenuItems = [
+  const pressMenuItems: MenuItem[] = [
     {
       id: "dashboard",
       label: "Active Jobs",
@@ -71,7 +81,7 @@ export const DesktopSidebar: React.FC<DesktopSidebarProps> = ({
     },
   ];
 
-  const publisherMenuItems = [
+  const publisherMenuItems: MenuItem[] = [
     {
       id: "dashboard",
       label: "My Orders",
