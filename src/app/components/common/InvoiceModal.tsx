@@ -1,20 +1,47 @@
-import React from "react";
+import React, { useState } from "react";
 import { JobOrder } from "../../types";
-import { X, Printer, CheckCircle2, ShieldCheck, AlertCircle } from "lucide-react";
+import { formatDateBn } from "../../lib/calc";
+import {
+  X,
+  Printer,
+  CheckCircle2,
+  ShieldCheck,
+  AlertCircle,
+  Send,
+  Loader2,
+  Smartphone,
+  MessageSquare,
+} from "lucide-react";
 
 interface InvoiceModalProps {
   job: JobOrder | null;
   onClose: () => void;
   onMarkPaid?: (jobId: string) => void;
+  onSubmitPayment?: (jobId: string, trxId: string, amountBdt: number) => Promise<void>;
+  onSendMessage?: (jobId: string, note: string) => Promise<void>;
   isPressOwner?: boolean;
+  pressLocation?: string;
+  publisherLocation?: string;
 }
 
 export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   job,
   onClose,
   onMarkPaid,
+  onSubmitPayment,
+  onSendMessage,
   isPressOwner = false,
+  pressLocation = "",
+  publisherLocation = "",
 }) => {
+  const [trxId, setTrxId] = useState("");
+  const [payAmount, setPayAmount] = useState<number>(job?.amountBdt ?? 0);
+  const [messageNote, setMessageNote] = useState("");
+  const [showMessageBox, setShowMessageBox] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSendingMsg, setIsSendingMsg] = useState(false);
+  const [errorText, setErrorText] = useState<string | null>(null);
+
   if (!job) return null;
 
   const total = job.totalIntake ?? job.coversCount;
@@ -23,9 +50,45 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const mathMatched = good != null && waste != null && good + waste === total;
   const isPaid = job.paymentStatus === "Paid";
   const isOverdue = job.paymentStatus === "Overdue" || (job.daysOverdue || 0) > 30;
+  const hasBkash = Boolean(job.bkashTrxId);
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handleSubmitPayment = async () => {
+    if (!onSubmitPayment || !trxId.trim()) {
+      setErrorText("Enter the bKash transaction ID before submitting.");
+      return;
+    }
+    if (!Number.isFinite(payAmount) || payAmount <= 0) {
+      setErrorText("Enter the amount you sent via bKash.");
+      return;
+    }
+    setErrorText(null);
+    setIsSubmitting(true);
+    try {
+      await onSubmitPayment(job.id, trxId.trim(), Math.round(payAmount));
+    } catch (err) {
+      setErrorText(err instanceof Error ? err.message : "Could not submit payment. Try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!onSendMessage || !messageNote.trim()) return;
+    setErrorText(null);
+    setIsSendingMsg(true);
+    try {
+      await onSendMessage(job.id, messageNote.trim());
+      setMessageNote("");
+      setShowMessageBox(false);
+    } catch (err) {
+      setErrorText(err instanceof Error ? err.message : "Could not send message. Try again.");
+    } finally {
+      setIsSendingMsg(false);
+    }
   };
 
   return (
@@ -72,18 +135,18 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           </div>
         </div>
 
-        {/* Press vs Publisher header info */}
+        {/* Press vs Publisher header info with full addresses */}
         <div className="grid grid-cols-2 gap-4 p-4 bg-green-50/40 rounded-xl border border-green-100 text-xs">
           <div>
             <p className="font-bold text-gray-400 uppercase tracking-wider mb-1">Issued By (Press)</p>
             <p className="font-bold text-green-950 text-sm">{job.pressName}</p>
-            <p className="text-gray-600">{job.pressOwnerName}</p>
-            <p className="text-gray-500">Dhaka, Bangladesh</p>
+            {job.pressOwnerName && <p className="text-gray-600">{job.pressOwnerName}</p>}
+            <p className="text-gray-500">{pressLocation || "Dhaka, Bangladesh"}</p>
           </div>
           <div>
             <p className="font-bold text-gray-400 uppercase tracking-wider mb-1">Billed To (Publisher)</p>
             <p className="font-bold text-green-950 text-sm">{job.publisherName}</p>
-            <p className="text-gray-500">Dhaka, Bangladesh</p>
+            <p className="text-gray-500">{publisherLocation || "Dhaka, Bangladesh"}</p>
           </div>
         </div>
 
@@ -168,26 +231,211 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           <div className="text-right">
             <p className="text-xs text-gray-400">Due Date</p>
             <p className={`text-sm font-bold ${isOverdue && !isPaid ? "text-red-400" : "text-white"}`}>
-              {job.invoiceDueDate || "—"}
+              {formatDateBn(job.invoiceDueDate || "") || "—"}
             </p>
           </div>
         </div>
 
+        {/* Payment Flow */}
+        {!isPaid ? (
+          <div className="space-y-3">
+            {isPressOwner ? (
+              <>
+                {/* Press: review bKash submission or mark paid manually */}
+                {hasBkash && (
+                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 text-xs space-y-2">
+                    <div className="flex items-center gap-2 font-extrabold text-blue-900">
+                      <Smartphone className="w-4 h-4" />
+                      Client bKash Payment Submitted
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Transaction ID:</span>
+                      <span className="font-mono font-bold text-gray-900">{job.bkashTrxId}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Amount Sent:</span>
+                      <span className="font-mono font-bold text-gray-900">
+                        BDT {job.bkashAmount?.toLocaleString() ?? "—"}
+                      </span>
+                    </div>
+                    {job.paymentSubmittedAt && (
+                      <div className="flex justify-between text-gray-700">
+                        <span>Submitted:</span>
+                        <span className="font-mono font-bold text-gray-900">
+                          {new Date(job.paymentSubmittedAt).toLocaleString()}
+                        </span>
+                      </div>
+                    )}
+                    <p className="text-[11px] text-blue-800">
+                      Verify the transaction in your bKash merchant account before confirming receipt.
+                    </p>
+
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
+                      <button
+                        onClick={() => {
+                          onMarkPaid?.(job.id);
+                          onClose();
+                        }}
+                        className="flex-1 py-2.5 px-4 bg-[#2e7d46] text-white font-semibold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center justify-center gap-2"
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        Confirm Received — Mark Paid
+                      </button>
+                      <button
+                        onClick={() => setShowMessageBox(!showMessageBox)}
+                        className="flex-1 py-2.5 px-4 bg-white border border-blue-400 text-blue-800 font-semibold text-xs rounded-xl hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                      >
+                        <MessageSquare className="w-4 h-4" />
+                        Ask Client About Issue
+                      </button>
+                    </div>
+
+                    {showMessageBox && (
+                      <div className="space-y-2 pt-1">
+                        <textarea
+                          rows={2}
+                          value={messageNote}
+                          onChange={(e) => setMessageNote(e.target.value)}
+                          placeholder="e.g. The amount received is BDT 5,000 less than the invoice. Please send the remaining amount."
+                          className="w-full p-2.5 bg-white border border-blue-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={handleSendMessage}
+                          disabled={isSendingMsg || !messageNote.trim()}
+                          className="py-2 px-3 bg-blue-700 text-white font-bold text-xs rounded-lg hover:bg-blue-800 transition-colors flex items-center gap-1.5"
+                        >
+                          {isSendingMsg ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+                          Send Message to Client
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Manual Paid fallback with warning — always available */}
+                {onMarkPaid && (
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-300 text-xs space-y-2">
+                    <p className="text-amber-900 font-semibold flex items-center gap-1.5">
+                      <AlertCircle className="w-4 h-4 text-amber-700 shrink-0" />
+                      Two-step payment guard: for bKash, always review the client's transaction above and click "Confirm Received — Mark Paid". Only use the manual button below if payment was received outside bKash (cash / bank / cheque).
+                    </p>
+                    <button
+                      onClick={() => {
+                        onMarkPaid?.(job.id);
+                        onClose();
+                      }}
+                      className="w-full py-2.5 px-4 bg-white border-2 border-amber-500 text-amber-800 font-semibold text-xs rounded-xl hover:bg-amber-100 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      Mark Paid Manually (Offline Payment)
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                {/* Publisher: submit bKash payment info */}
+                {hasBkash ? (
+                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 text-xs space-y-2">
+                    <div className="flex items-center gap-2 font-extrabold text-blue-900">
+                      <CheckCircle2 className="w-4 h-4" />
+                      bKash Payment Submitted
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Transaction ID:</span>
+                      <span className="font-mono font-bold text-gray-900">{job.bkashTrxId}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-700">
+                      <span>Amount Sent:</span>
+                      <span className="font-mono font-bold text-gray-900">
+                        BDT {job.bkashAmount?.toLocaleString() ?? "—"}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-blue-800">
+                      Awaiting press confirmation. Once {job.pressName} verifies the transaction, your invoice will be marked Paid and any credit hold will lift automatically.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs space-y-3">
+                    <div className="flex items-center gap-2 font-extrabold text-emerald-900">
+                      <Smartphone className="w-4 h-4" />
+                      Pay Invoice via bKash
+                    </div>
+                    <p className="text-[11px] text-emerald-800">
+                      Send BDT {job.amountBdt?.toLocaleString() ?? "—"} to {job.pressName}&apos;s bKash merchant number, then submit your transaction details below. The press verifies the payment before marking the invoice paid.
+                    </p>
+                    <div className="space-y-2 pt-1">
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
+                          bKash Transaction ID
+                        </label>
+                        <input
+                          type="text"
+                          value={trxId}
+                          onChange={(e) => setTrxId(e.target.value)}
+                          placeholder="e.g. 9HGK2J3M4N"
+                          className="w-full p-2.5 bg-white border border-emerald-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-[10px] font-bold text-emerald-900 uppercase tracking-wider">
+                          Amount Sent (BDT)
+                        </label>
+                        <input
+                          type="number"
+                          value={payAmount}
+                          min={1}
+                          onChange={(e) => setPayAmount(Number(e.target.value))}
+                          className="w-full p-2.5 bg-white border border-emerald-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                        />
+                      </div>
+                      <button
+                        onClick={handleSubmitPayment}
+                        disabled={isSubmitting}
+                        className="w-full py-2.5 px-4 bg-[#2e7d46] text-white font-bold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center justify-center gap-2"
+                      >
+                        {isSubmitting ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Send className="w-4 h-4" />
+                        )}
+                        Submit bKash Payment Info
+                      </button>
+                      <p className="text-[10px] text-gray-500">
+                        Can&apos;t pay by bKash? Settle with {job.pressName} directly — the press can mark the invoice paid manually.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Press message to client, if any */}
+                {job.paymentNote && (
+                  <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                    <MessageSquare className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                    <span>
+                      <strong>Message from {job.pressName}:</strong> "{job.paymentNote}"
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {errorText && (
+              <div className="p-3 bg-red-50 border border-red-300 text-red-900 rounded-xl font-semibold text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                {errorText}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-900 flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-[#2e7d46] shrink-0" />
+            <span>This invoice has been paid{job.bkashTrxId ? ` via bKash (TRX ${job.bkashTrxId})` : ""}. Credit hold automatically lifted.</span>
+          </div>
+        )}
+
         {/* Bottom Actions */}
         <div className="flex flex-col sm:flex-row gap-3 pt-2">
-          {isPressOwner && !isPaid && onMarkPaid && (
-            <button
-              onClick={() => {
-                onMarkPaid(job.id);
-                onClose();
-              }}
-              className="flex-1 py-2.5 px-4 bg-[#2e7d46] text-white font-semibold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center justify-center gap-2"
-            >
-              <CheckCircle2 className="w-4 h-4" />
-              Mark Payment Received (Lift Credit Hold)
-            </button>
-          )}
-
           <button
             onClick={onClose}
             className="py-2.5 px-4 bg-gray-100 text-gray-700 font-semibold text-xs rounded-xl hover:bg-gray-200 transition-colors"

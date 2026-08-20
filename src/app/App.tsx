@@ -639,6 +639,54 @@ export default function App() {
     }
   };
 
+  // Action: Publisher submits a bKash payment attempt for an invoice
+  const handleSubmitBkashPayment = async (jobId: string, trxId: string, amountBdt: number) => {
+    await jobService.submitBkashPayment(jobId, trxId, amountBdt);
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId
+          ? {
+              ...j,
+              bkashTrxId: trxId,
+              bkashAmount: amountBdt,
+              paymentSubmittedAt: new Date().toISOString(),
+            }
+          : j
+      )
+    );
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "bKash Payment Submitted",
+      message: `Publisher submitted bKash payment (TRX ${trxId}, BDT ${amountBdt.toLocaleString()}) for ${jobId}. Awaiting press confirmation.`,
+      type: "credit" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
+  };
+
+  // Action: Press replies to a bKash payment attempt with a message
+  const handleSendPaymentMessage = async (jobId: string, note: string) => {
+    await jobService.sendPaymentMessage(jobId, note);
+    setJobs((prev) =>
+      prev.map((j) => (j.id === jobId ? { ...j, paymentNote: note } : j))
+    );
+    const match = jobs.find((j) => j.id === jobId);
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: "Payment Query from Press",
+      message: `${match?.pressName || "Press"} replied about your bKash payment on ${jobId}: "${note}"`,
+      type: "credit" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
+  };
+
   // Action: Create New Order
   const handleCreateOrder = (newOrd: {
     bookTitle: string;
@@ -1040,7 +1088,13 @@ export default function App() {
           job={selectedInvoiceModal}
           onClose={() => setSelectedInvoiceModal(null)}
           onMarkPaid={(id) => handleMarkInvoicePaid(id)}
+          onSubmitPayment={(id, trxId, amount) => handleSubmitBkashPayment(id, trxId, amount)}
+          onSendMessage={(id, note) => handleSendPaymentMessage(id, note)}
           isPressOwner={userRole === "press_owner"}
+          pressLocation={pressLocations[selectedInvoiceModal.pressName] || ""}
+          publisherLocation={
+            publishers.find((p) => p.name === selectedInvoiceModal.publisherName)?.location || ""
+          }
         />
       )}
 

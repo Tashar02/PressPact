@@ -28,6 +28,10 @@ function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = []): JobOrder {
     invoiceDueDate: row.invoice_due_date || undefined,
     paymentStatus: row.payment_status || undefined,
     daysOverdue: row.days_overdue || 0,
+    bkashTrxId: row.bkash_trx_id || undefined,
+    bkashAmount: row.bkash_amount != null ? Number(row.bkash_amount) : undefined,
+    paymentSubmittedAt: row.payment_submitted_at || undefined,
+    paymentNote: row.payment_note || undefined,
   };
 }
 
@@ -280,6 +284,36 @@ export const jobService = {
         payment_status: "Paid",
         days_overdue: 0,
       })
+      .eq("id", jobId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Two-step payment, step 1: the publisher submits their bKash transaction
+   * id and amount sent so the press can verify before confirming.
+   */
+  async submitBkashPayment(jobId: string, trxId: string, amountBdt: number): Promise<void> {
+    const { error } = await supabase
+      .from("job_orders")
+      .update({
+        bkash_trx_id: trxId,
+        bkash_amount: amountBdt,
+        payment_submitted_at: new Date().toISOString(),
+      })
+      .eq("id", jobId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Press responds to a bKash payment attempt (e.g. amount mismatch) with a
+   * message the publisher sees next time they open the invoice.
+   */
+  async sendPaymentMessage(jobId: string, note: string): Promise<void> {
+    const { error } = await supabase
+      .from("job_orders")
+      .update({ payment_note: note })
       .eq("id", jobId);
 
     if (error) throw error;
