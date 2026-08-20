@@ -1,19 +1,13 @@
 import React, { useState } from "react";
-import { JobOrder, UserRole } from "../../types";
+import { JobOrder } from "../../types";
+import { daysPastDue } from "../../lib/calc";
 import {
   LayoutDashboard,
   FileCheck,
   Calculator,
-  Layers,
-  Users,
-  Plus,
-  ArrowUpRight,
   Clock,
-  CheckCircle2,
   AlertTriangle,
-  ChevronRight,
   Eye,
-  FileText,
   Search,
 } from "lucide-react";
 
@@ -38,7 +32,17 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
   const activeJobsCount = jobs.filter((j) => j.status !== "Completed").length;
   const pendingProofsCount = jobs.filter((j) => j.status === "Awaiting Proof").length;
   const pendingYieldCount = jobs.filter((j) => j.status === "In Production").length;
-  const overdueCount = jobs.filter((j) => j.paymentStatus === "Overdue").length;
+
+  // An invoice is "overdue" the moment it crosses 30 days past due, whether it
+  // was stored as Unpaid or Overdue — the same rule the credit hold uses.
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const overdueCount = jobs.filter(
+    (j) =>
+      j.paymentStatus !== "Paid" &&
+      j.invoiceDueDate &&
+      daysPastDue(j.invoiceDueDate, today) > 30
+  ).length;
 
   const filteredJobs = jobs.filter((j) => {
     const matchesStage =

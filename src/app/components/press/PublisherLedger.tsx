@@ -1,13 +1,11 @@
 import React from "react";
 import { PublisherClient, JobOrder } from "../../types";
+import { daysPastDue } from "../../lib/calc";
 import {
   Users,
   ShieldAlert,
   CheckCircle2,
   Phone,
-  FileText,
-  DollarSign,
-  AlertTriangle,
   Receipt,
 } from "lucide-react";
 
@@ -68,8 +66,16 @@ export const PublisherLedger: React.FC<PublisherLedgerProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {publishers.map((pub) => {
+                // Find the unpaid invoice driving this publisher's credit hold,
+                // using the real due date rather than a stored "Overdue" label.
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
                 const triggeringJob = jobs.find(
-                  (j) => j.publisherName === pub.name && j.paymentStatus === "Overdue"
+                  (j) =>
+                    j.publisherName === pub.name &&
+                    j.paymentStatus !== "Paid" &&
+                    j.invoiceDueDate &&
+                    daysPastDue(j.invoiceDueDate, today) > 30
                 );
 
                 return (
