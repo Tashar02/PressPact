@@ -7,6 +7,7 @@ import {
   Receipt,
   Save,
   HelpCircle,
+  Lock,
 } from "lucide-react";
 
 interface YieldValidatorProps {
@@ -46,7 +47,8 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Sync state when selected job changes
+  // Sync state only when the job under audit actually changes; keying on the
+  // id (not the whole object) stops a parent refresh from wiping typed input.
   React.useEffect(() => {
     if (currentJob) {
       setTotalIntake(currentJob.totalIntake ?? currentJob.coversCount ?? 0);
@@ -54,12 +56,15 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
       setWasteCount(currentJob.wasteCount ?? 0);
       setInvoiceAmount(currentJob.amountBdt ?? 0);
     }
-  }, [currentJob]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentJob?.id]);
 
   const calculatedSum = Number(goodOutput) + Number(wasteCount);
   const isMatched = calculatedSum === Number(totalIntake);
   // Only jobs that completed proof approval and production may be invoiced
   const canInvoice = currentJob?.status === "In Production";
+  // Once a job is invoiced its yield figures are frozen for the audit trail
+  const isLocked = ["Invoiced", "Completed"].includes(currentJob?.status ?? "");
 
   const handleSaveDraft = async () => {
     if (!currentJob) return;
@@ -153,10 +158,15 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
               </div>
               <button
                 onClick={handleSaveDraft}
-                className="px-3 py-1.5 bg-green-50 text-[#2e7d46] border border-green-200 rounded-xl font-semibold text-xs hover:bg-green-100 transition-colors flex items-center gap-1.5"
+                disabled={isLocked}
+                className={`px-3 py-1.5 border rounded-xl font-semibold text-xs transition-colors flex items-center gap-1.5 ${
+                  isLocked
+                    ? "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed"
+                    : "bg-green-50 text-[#2e7d46] border-green-200 hover:bg-green-100"
+                }`}
               >
                 <Save className="w-3.5 h-3.5" />
-                Save Draft
+                {isLocked ? "Frozen after invoicing" : "Save Draft"}
               </button>
             </div>
 
@@ -182,8 +192,9 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                   <input
                     type="number"
                     value={totalIntake}
+                    disabled={isLocked}
                     onChange={(e) => setTotalIntake(Number(e.target.value))}
-                    className="w-full pl-4 pr-16 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                    className={`w-full pl-4 pr-16 py-2.5 bg-gray-50 border rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46] ${isLocked ? "border-gray-200 cursor-not-allowed" : "border-gray-200"}`}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">
                     covers
@@ -201,8 +212,9 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                     <input
                       type="number"
                       value={goodOutput}
+                      disabled={isLocked}
                       onChange={(e) => setGoodOutput(Number(e.target.value))}
-                      className="w-full pl-4 pr-16 py-2.5 bg-emerald-50/50 border border-emerald-300 rounded-xl text-sm font-mono font-bold text-emerald-950 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                      className={`w-full pl-4 pr-16 py-2.5 bg-emerald-50/50 border rounded-xl text-sm font-mono font-bold text-emerald-950 focus:outline-none focus:ring-2 focus:ring-[#2e7d46] ${isLocked ? "border-emerald-200 cursor-not-allowed" : "border-emerald-300"}`}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-emerald-600">
                       covers
@@ -218,8 +230,9 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                     <input
                       type="number"
                       value={wasteCount}
+                      disabled={isLocked}
                       onChange={(e) => setWasteCount(Number(e.target.value))}
-                      className="w-full pl-4 pr-16 py-2.5 bg-amber-50/50 border border-amber-300 rounded-xl text-sm font-mono font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className={`w-full pl-4 pr-16 py-2.5 bg-amber-50/50 border rounded-xl text-sm font-mono font-bold text-amber-950 focus:outline-none focus:ring-2 focus:ring-amber-500 ${isLocked ? "border-amber-200 cursor-not-allowed" : "border-amber-300"}`}
                     />
                     <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-amber-600">
                       covers
@@ -291,7 +304,16 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                 </div>
               )}
 
-              {!canInvoice && (
+              {isLocked && (
+                <div className="p-3.5 bg-gray-100/70 rounded-xl border border-gray-200 text-xs text-gray-600 flex items-start gap-2">
+                  <Lock className="w-4 h-4 text-gray-500 shrink-0 mt-0.5" />
+                  <span>
+                    This order is already invoiced. Yield figures are frozen and cannot be edited — they now form part of the permanent audit trail.
+                  </span>
+                </div>
+              )}
+
+              {!canInvoice && !isLocked && (
                 <div className="p-3.5 bg-amber-100/70 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
                   <HelpCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
                   <span>
@@ -310,9 +332,10 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                     type="number"
                     min={1}
                     value={invoiceAmount}
+                    disabled={isLocked}
                     onChange={(e) => setInvoiceAmount(Number(e.target.value))}
                     placeholder="e.g. 45000"
-                    className="w-full pl-4 pr-16 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                    className={`w-full pl-4 pr-16 py-2.5 bg-gray-50 border rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46] ${isLocked ? "border-gray-200 cursor-not-allowed" : "border-gray-200"}`}
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">
                     BDT

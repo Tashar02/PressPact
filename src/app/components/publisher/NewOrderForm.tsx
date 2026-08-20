@@ -1,16 +1,14 @@
 import React, { useState } from "react";
 import { FilmStockItem } from "../../types";
+import { estimateFilmMeters } from "../../lib/calc";
 import {
-  PlusCircle,
   AlertTriangle,
   CheckCircle2,
   BookOpen,
   Layers,
-  Calendar,
   ShieldAlert,
   Send,
   FileText,
-  Phone,
 } from "lucide-react";
 
   interface NewOrderFormProps {
@@ -46,7 +44,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
   // Material Coverage Calculation
-  const estimatedFilmMeters = Math.round(coversCount * 0.7);
+  const estimatedFilmMeters = estimateFilmMeters(coversCount);
   const currentStockItem = stock.find((s) => s.type === laminationType);
   const availableMeters = currentStockItem?.availableMeters || 0;
   const isStockInsufficient = estimatedFilmMeters > availableMeters;

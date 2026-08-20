@@ -8,7 +8,7 @@ import {
   NotificationItem,
 } from "./types";
 import { supabase } from "./lib/supabase";
-import { daysPastDue } from "./lib/calc";
+import { daysPastDue, estimateFilmMeters } from "./lib/calc";
 import { authService } from "./services/authService";
 import { jobService } from "./services/jobService";
 import { stockService } from "./services/stockService";
@@ -612,7 +612,7 @@ export default function App() {
       dueDate: newOrd.dueDate,
       orderDate: new Date().toISOString().split("T")[0],
       status: "Order Placed",
-      estimatedFilmMeters: Math.round(newOrd.coversCount * 0.7),
+      estimatedFilmMeters: estimateFilmMeters(newOrd.coversCount),
       proofLogs: [],
     };
 
