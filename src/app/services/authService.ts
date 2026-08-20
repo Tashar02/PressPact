@@ -118,6 +118,25 @@ export const authService = {
   async signIn(email: string, password: string, selectedRole: UserRole): Promise<UserProfile> {
     const cleanEmail = email.trim().toLowerCase();
 
+    // Check the stored role before creating a session. signInWithPassword
+    // triggers Supabase's SIGNED_IN event and the app's auth listener signs
+    // the user in immediately, which would unmount the login form and erase
+    // the error message. Rejecting the role mismatch up front keeps the user
+    // on the login page with a visible error (FR-5.1).
+    const { data: preProfile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("email", cleanEmail)
+      .maybeSingle();
+    const preRole = preProfile?.role as UserRole | undefined;
+    if (preRole && preRole !== selectedRole) {
+      throw new Error(
+        `This account is registered as a ${
+          preRole === "press_owner" ? "Press Owner" : "Publisher Client"
+        }. Please select the matching role to sign in.`
+      );
+    }
+
     const { data, error } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
       password: password,
@@ -152,9 +171,9 @@ export const authService = {
       profileRow?.role || userMeta.role || userMeta.user_role;
 
     if (storedRole && storedRole !== selectedRole) {
-      // signInWithPassword already created a session above; roll it back so a
-      // role mismatch genuinely blocks access instead of just logging an error
-      // while the auth listener signs the user in anyway (FR-5.1).
+      // Fallback for accounts without a profiles row: signInWithPassword
+      // already created a session, so roll it back before rejecting so the
+      // auth listener cannot sign the user in anyway.
       await supabase.auth.signOut();
       throw new Error(
         `This account is registered as a ${
