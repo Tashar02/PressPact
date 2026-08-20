@@ -36,6 +36,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccessToast, setIsSuccessToast] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Proofs may only be submitted for orders that have not entered production
@@ -56,6 +57,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
     if (!currentJob || !canUploadProof) return;
 
     setIsUploading(true);
+    setErrorMessage(null);
     let finalUrl = photoUrl;
 
     try {
@@ -67,6 +69,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
       setTimeout(() => setIsSuccessToast(false), 4000);
     } catch (err) {
       console.error("Proof submission error:", err);
+      setErrorMessage(err instanceof Error ? err.message : "Proof upload failed. Please try again.");
     } finally {
       setIsUploading(false);
     }
@@ -121,6 +124,13 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-[#2e7d46]" />
           Proof photo and note successfully uploaded &amp; status changed to "Awaiting Proof". Notification sent to {currentJob?.publisherName}.
+        </div>
+      )}
+
+      {errorMessage && (
+        <div className="p-4 bg-red-50 border border-red-300 text-red-900 rounded-xl font-semibold text-xs flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          {errorMessage}
         </div>
       )}
 

@@ -116,6 +116,8 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
                 className={`px-3 py-1 rounded-full text-xs font-bold ${
                   currentJob.status === "Awaiting Proof"
                     ? "bg-amber-100 text-amber-800"
+                    : currentJob.status === "Proof Rejected"
+                    ? "bg-red-100 text-red-700"
                     : currentJob.status === "In Production"
                     ? "bg-emerald-100 text-emerald-800"
                     : "bg-gray-100 text-gray-800"
@@ -211,6 +213,18 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
                       Approve for Full Run
                     </button>
                   </div>
+                </div>
+              ) : currentJob.status === "Proof Rejected" ? (
+                <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-xs text-red-950 font-bold flex items-start gap-2">
+                  <XCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <span>
+                    This proof was rejected. Awaiting a revised proof from {currentJob.pressName}.
+                  </span>
+                </div>
+              ) : currentJob.status === "Order Placed" ? (
+                <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-600 font-semibold flex items-start gap-2">
+                  <Clock className="w-5 h-5 text-gray-500 shrink-0 mt-0.5" />
+                  <span>Waiting for {currentJob.pressName} to upload a sample proof.</span>
                 </div>
               ) : (
                 <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 text-xs text-emerald-950 font-bold flex items-center gap-2">

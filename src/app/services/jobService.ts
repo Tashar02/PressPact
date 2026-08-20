@@ -78,40 +78,30 @@ export const jobService = {
   },
 
   /**
-   * Upload proof image file to Supabase Storage bucket 'proofs'
+   * Upload proof image file to Supabase Storage bucket 'proofs'.
+   * Throws when the bucket upload fails so a proof is never silently
+   * recorded with a local-only copy that the publisher cannot see.
    */
   async uploadProofImageFile(file: File, jobId: string): Promise<string> {
-    try {
-      const fileExt = file.name.split(".").pop() || "jpg";
-      const fileName = `${jobId.replace("#", "")}-${Date.now()}.${fileExt}`;
-      const filePath = `samples/${fileName}`;
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `${jobId.replace("#", "")}-${Date.now()}.${fileExt}`;
+    const filePath = `samples/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("proofs")
-        .upload(filePath, file, {
-          cacheControl: "3600",
-          upsert: true,
-        });
-
-      if (uploadError) {
-        console.warn("Supabase Storage bucket upload notice:", uploadError.message);
-        // Fallback to local Data URL for seamless client viewing if bucket policies aren't created yet
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result as string);
-          reader.readAsDataURL(file);
-        });
-      }
-
-      const { data } = supabase.storage.from("proofs").getPublicUrl(filePath);
-      return data.publicUrl;
-    } catch (e) {
-      return new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
+    const { error: uploadError } = await supabase.storage
+      .from("proofs")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true,
       });
+
+    if (uploadError) {
+      throw new Error(
+        "Proof photo could not be uploaded to the shared proof bucket. Please check storage permissions and try again."
+      );
     }
+
+    const { data } = supabase.storage.from("proofs").getPublicUrl(filePath);
+    return data.publicUrl;
   },
 
   /**
