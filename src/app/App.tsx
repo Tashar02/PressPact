@@ -202,19 +202,6 @@ export default function App() {
     setActiveTab("dashboard");
   };
 
-  // Toggle Role Action (for testing & demo purposes)
-  const handleRoleToggle = () => {
-    const nextRole = userRole === "press_owner" ? "publisher" : "press_owner";
-    setUserRole(nextRole);
-    if (currentUser) {
-      setCurrentUser({
-        ...currentUser,
-        role: nextRole,
-      });
-    }
-    setActiveTab("dashboard");
-  };
-
   // Dynamic filter: Users only see jobs matching their respective business name
   const visibleJobs = useMemo(() => {
     if (!currentUser) return [];
@@ -717,7 +704,6 @@ export default function App() {
         <TopHeader
           role={userRole}
           currentUser={currentUser}
-          onRoleToggle={handleRoleToggle}
           onLogout={handleLogout}
           activeTabTitle={tabTitles[activeTab] || "PressPact Portal"}
           notifications={visibleNotifications}

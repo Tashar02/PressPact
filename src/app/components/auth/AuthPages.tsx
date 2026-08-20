@@ -72,7 +72,7 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
         // Switch to login tab after a short delay so user can read the message
         setTimeout(() => switchMode(false), 2000);
       } else {
-        const loggedInProfile = await authService.signIn(email, password);
+        const loggedInProfile = await authService.signIn(email, password, role);
         onLoginSuccess(loggedInProfile);
       }
     } catch (err: any) {
@@ -172,41 +172,39 @@ export const AuthPages: React.FC<AuthPagesProps> = ({ onLoginSuccess }) => {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Role Selection — only on signup */}
-            {isSignup && (
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-gray-800">
-                  Select Your Account Role
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setRole("press_owner")}
-                    className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                      role === "press_owner"
-                        ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
-                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    <Building className="w-4 h-4" />
-                    <span>Press Owner</span>
-                  </button>
+            {/* Role Selection — required at both Sign Up and Login (FR-5.1) */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-gray-800">
+                Select Your Account Role
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRole("press_owner")}
+                  className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                    role === "press_owner"
+                      ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <Building className="w-4 h-4" />
+                  <span>Press Owner</span>
+                </button>
 
-                  <button
-                    type="button"
-                    onClick={() => setRole("publisher")}
-                    className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
-                      role === "publisher"
-                        ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
-                        : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
-                    }`}
-                  >
-                    <BookOpen className="w-4 h-4" />
-                    <span>Publisher Client</span>
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setRole("publisher")}
+                  className={`p-3 rounded-xl border text-xs font-bold transition-all flex flex-col items-center gap-1 cursor-pointer ${
+                    role === "publisher"
+                      ? "bg-emerald-50 border-[#2e7d46] text-[#2e7d46] ring-2 ring-[#2e7d46]/20"
+                      : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Publisher Client</span>
+                </button>
               </div>
-            )}
+            </div>
 
             {/* Signup-only Fields */}
             {isSignup && (

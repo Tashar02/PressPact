@@ -3,7 +3,6 @@ import { UserRole, UserProfile, NotificationItem } from "../../types";
 import {
   Bell,
   Search,
-  ArrowLeftRight,
   Menu,
   X,
   CheckCircle,
@@ -17,7 +16,6 @@ import {
 interface TopHeaderProps {
   role: UserRole;
   currentUser?: UserProfile | null;
-  onRoleToggle?: () => void;
   onLogout?: () => void;
   activeTabTitle: string;
   notifications: NotificationItem[];
@@ -29,7 +27,6 @@ interface TopHeaderProps {
 export const TopHeader: React.FC<TopHeaderProps> = ({
   role,
   currentUser,
-  onRoleToggle,
   onLogout,
   activeTabTitle,
   notifications,

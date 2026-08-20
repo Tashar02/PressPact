@@ -111,9 +111,11 @@ export const authService = {
   },
 
   /**
-   * Sign in user with email and password
+   * Sign in user with email, password, and the role selected at login (FR-5.1).
+   * The selected role must match the role stored on the account; otherwise the
+   * sign-in is rejected so a user can never be routed to the wrong portal.
    */
-  async signIn(email: string, password: string): Promise<UserProfile> {
+  async signIn(email: string, password: string, selectedRole: UserRole): Promise<UserProfile> {
     const cleanEmail = email.trim().toLowerCase();
 
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -146,14 +148,29 @@ export const authService = {
       .single();
 
     const userMeta = data.user.user_metadata || {};
-    const role: UserRole = profileRow?.role || userMeta.role || "publisher";
+    const storedRole: UserRole | undefined =
+      profileRow?.role || userMeta.role || userMeta.user_role;
+
+    if (storedRole && storedRole !== selectedRole) {
+      throw new Error(
+        `This account is registered as a ${
+          storedRole === "press_owner" ? "Press Owner" : "Publisher Client"
+        }. Please select the matching role to sign in.`
+      );
+    }
+
+    const role: UserRole = storedRole || selectedRole;
     const fullName =
-      profileRow?.full_name || userMeta.fullName || userMeta.full_name || cleanEmail.split("@")[0];
+      profileRow?.full_name ||
+      userMeta.fullName ||
+      userMeta.full_name ||
+      cleanEmail.split("@")[0];
+    // No fabricated business names: a user without a stored profile starts clean
     const businessName =
       profileRow?.business_name ||
       userMeta.businessName ||
       userMeta.business_name ||
-      (role === "press_owner" ? "Nova Lamination" : "Publisher Workspace");
+      cleanEmail.split("@")[0];
 
     return {
       id: data.user.id,
@@ -195,7 +212,8 @@ export const authService = {
       .single();
 
     const userMeta = user.user_metadata || {};
-    const role: UserRole = profileRow?.role || userMeta.role || "publisher";
+    const role: UserRole =
+      profileRow?.role || userMeta.role || userMeta.user_role || "publisher";
 
     return {
       id: user.id,
@@ -211,7 +229,8 @@ export const authService = {
         profileRow?.business_name ||
         userMeta.businessName ||
         userMeta.business_name ||
-        (role === "press_owner" ? "Nova Lamination" : "Publisher Workspace"),
+        user.email?.split("@")[0] ||
+        "User",
       phone: profileRow?.phone || userMeta.phone,
       location: profileRow?.location || userMeta.shopLocation,
     };
