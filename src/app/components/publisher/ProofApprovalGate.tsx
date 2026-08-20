@@ -87,11 +87,16 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
             }}
             className="w-full text-xs font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
           >
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.id}: {j.bookTitle} ({j.status})
-              </option>
-            ))}
+            {jobs.map((j) => {
+              const reviewed =
+                j.proofLogs?.some((l) => l.action === "approved") ||
+                ["In Production", "Invoiced", "Completed"].includes(j.status);
+              return (
+                <option key={j.id} value={j.id}>
+                  {reviewed ? "✓" : "○"} {j.id}: {j.bookTitle} ({j.status})
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -130,33 +135,60 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
             </div>
 
             {/* High Res Photo Frame */}
-            <div className="relative rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-inner h-72 group">
-              {currentJob.proofPhotoUrl ? (
-                <>
-                  <img
-                    src={currentJob.proofPhotoUrl}
-                    alt="Uploaded proof sample"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
-                    <div className="text-white space-y-0.5">
-                      <p className="text-xs font-bold flex items-center gap-1.5">
-                        <ImageIcon className="w-4 h-4 text-emerald-400" />
-                        Uploaded Proof Sample (2 Test Covers)
-                      </p>
-                      <p className="text-[11px] text-gray-300">
-                        Finish: <strong>{currentJob.laminationType}</strong>
-                      </p>
+            <div className="relative rounded-2xl overflow-hidden bg-gray-100 border border-gray-200 shadow-inner group">
+              {(() => {
+                const photos = currentJob.proofPhotos?.length
+                  ? currentJob.proofPhotos
+                  : currentJob.proofPhotoUrl
+                  ? [currentJob.proofPhotoUrl]
+                  : [];
+                if (photos.length === 0) {
+                  return (
+                    <div className="flex flex-col items-center justify-center h-72 gap-3 text-gray-400">
+                      <ImageIcon className="w-10 h-10" />
+                      <p className="text-xs font-semibold">No proof photo uploaded yet</p>
+                      <p className="text-[10px] text-gray-400">Waiting for press to upload a sample</p>
+                    </div>
+                  );
+                }
+                return photos.length === 1 ? (
+                  <>
+                    <img
+                      src={photos[0]}
+                      alt="Uploaded proof sample"
+                      className="w-full h-72 object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent flex items-end p-4">
+                      <div className="text-white space-y-0.5">
+                        <p className="text-xs font-bold flex items-center gap-1.5">
+                          <ImageIcon className="w-4 h-4 text-emerald-400" />
+                          Uploaded Proof Sample ({currentJob.laminationType})
+                        </p>
+                        <p className="text-[11px] text-gray-300">
+                          Finish: <strong>{currentJob.laminationType}</strong>
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 p-2">
+                    {photos.map((url, idx) => (
+                      <img
+                        key={`${url}-${idx}`}
+                        src={url}
+                        alt={`Proof sample ${idx + 1}`}
+                        className={`w-full object-cover rounded-xl border border-gray-200 ${
+                          photos.length % 2 === 1 && idx === photos.length - 1 ? "col-span-2 h-56" : "h-44"
+                        }`}
+                      />
+                    ))}
+                    <div className="col-span-2 flex items-center gap-1.5 text-[11px] text-white font-semibold bg-black/50 rounded-xl px-3 py-1.5">
+                      <ImageIcon className="w-4 h-4 text-emerald-400" />
+                      {photos.length} test-cover sample photos ({currentJob.laminationType})
                     </div>
                   </div>
-                </>
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full gap-3 text-gray-400">
-                  <ImageIcon className="w-10 h-10" />
-                  <p className="text-xs font-semibold">No proof photo uploaded yet</p>
-                  <p className="text-[10px] text-gray-400">Waiting for press to upload a sample</p>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
 
@@ -167,7 +199,7 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
                 {currentJob.pressOwnerName ? ` (${currentJob.pressOwnerName})` : currentJob.pressName ? ` (${currentJob.pressName})` : ""}:
               </p>
               <p className="text-xs text-gray-800 leading-relaxed font-medium">
-                "{currentJob.proofNote || "Proof sample submitted. Please review carefully."}"
+                {currentJob.proofNote ? `"${currentJob.proofNote}"` : "No note from the press owner yet."}
               </p>
             </div>
           </div>

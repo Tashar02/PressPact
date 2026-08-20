@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FilmStockItem } from "../../types";
+import { FilmStockItem, CoverTypeItem } from "../../types";
 import { estimateFilmMeters, localTodayIso } from "../../lib/calc";
 import {
   AlertTriangle,
@@ -10,11 +10,14 @@ import {
   Send,
   FileText,
   XCircle,
+  BookMarked,
+  HelpCircle,
 } from "lucide-react";
 
 interface NewOrderFormProps {
   stock: FilmStockItem[];
   presses: string[];
+  coverTypes: CoverTypeItem[];
   isCreditHold: boolean;
   onCreateOrder: (order: {
     bookTitle: string;
@@ -22,6 +25,11 @@ interface NewOrderFormProps {
     laminationType: string;
     dueDate: string;
     pressName: string;
+    coverSupply?: "client_supplied" | "press_purchased";
+    coverType?: string;
+    coverStatus?: "requested" | "approved" | "rejected";
+    coverRequestPriceBdt?: number;
+    coverPriceBdt?: number;
   }) => void;
   onOpenCreditHoldNotice: () => void;
   overdueJob?: import("../../types").JobOrder | null;
@@ -30,6 +38,7 @@ interface NewOrderFormProps {
 export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   stock,
   presses,
+  coverTypes,
   isCreditHold,
   onCreateOrder,
   onOpenCreditHoldNotice,
@@ -48,6 +57,16 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   });
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
   const [dateError, setDateError] = useState<string | null>(null);
+
+  // Cover Supply selection
+  const [coverSupply, setCoverSupply] = useState<"client_supplied" | "press_purchased">("client_supplied");
+  const [coverType, setCoverType] = useState<string>("");
+  const [coverRequestMode, setCoverRequestMode] = useState(false);
+  const [coverRequestName, setCoverRequestName] = useState("");
+  const [coverRequestPrice, setCoverRequestPrice] = useState<number>(0);
+  const pressCoverTypes = coverTypes.filter((c) => c.pressName === pressName);
+  const selectedCoverType = pressCoverTypes.find((c) => c.name === coverType);
+  const coverRequested = coverSupply === "press_purchased" && coverRequestMode;
 
   // Only the selected press's own roll types are offered, and coverage is
   // checked against that press's inventory (each press manages stock itself).
@@ -88,6 +107,20 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
       setDateError(`${pressName} has not set up film inventory yet. Contact the press to restock.`);
       return;
     }
+    if (coverSupply === "press_purchased" && !coverRequestMode && !coverType) {
+      setDateError(`${pressName} has no cover types configured yet. Choose "Request a cover type" and offer a price, or supply your own covers.`);
+      return;
+    }
+    if (coverRequested && !coverRequestName.trim()) {
+      setDateError("Describe the cover type you want the press to source.");
+      return;
+    }
+    if (coverRequested && (Number(coverRequestPrice) || 0) <= 0) {
+      setDateError("Enter the per-cover price you are willing to pay for the press to source these covers.");
+      return;
+    }
+
+    const isExistingType = coverSupply === "press_purchased" && !coverRequestMode && !!selectedCoverType;
 
     onCreateOrder({
       bookTitle,
@@ -95,10 +128,19 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
       laminationType,
       dueDate,
       pressName,
+      coverSupply,
+      coverType: coverRequested ? coverRequestName.trim() : isExistingType ? coverType : undefined,
+      coverStatus: coverRequested ? "requested" : undefined,
+      coverRequestPriceBdt: coverRequested ? Number(coverRequestPrice) || 0 : undefined,
+      coverPriceBdt: isExistingType ? selectedCoverType.priceBdt : undefined,
     });
 
     setSubmittedSuccess(true);
     setBookTitle("");
+    setCoverRequestMode(false);
+    setCoverRequestName("");
+    setCoverRequestPrice(0);
+    setCoverType("");
     setTimeout(() => setSubmittedSuccess(false), 4000);
   };
 
@@ -269,6 +311,135 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                   <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">
                     {pressName || "This press"} has not configured any film roll inventory yet. Contact the press owner to add roll types before ordering.
                   </p>
+                )}
+              </div>
+
+              {/* Cover Supply Options */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700">
+                  Cover Supply Option
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCoverSupply("client_supplied")}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      coverSupply === "client_supplied"
+                        ? "border-[#2e7d46] bg-emerald-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookMarked className="w-4 h-4 text-[#2e7d46]" />
+                      <span className="text-xs font-extrabold text-gray-900">Client Supplies Covers</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      You bring the printed covers to the press. No cover charge — lamination only.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCoverSupply("press_purchased")}
+                    className={`p-3 rounded-xl border-2 text-left transition-all ${
+                      coverSupply === "press_purchased"
+                        ? "border-[#2e7d46] bg-emerald-50"
+                        : "border-gray-200 bg-white hover:border-gray-300"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-[#2e7d46]" />
+                      <span className="text-xs font-extrabold text-gray-900">Press Buys Covers</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 mt-1">
+                      The press sources the covers for you — a per-cover charge is added for the sourcing &amp; handling work.
+                    </p>
+                  </button>
+                </div>
+
+                {coverSupply === "press_purchased" && (
+                  <div className="p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-3 mt-1 animate-in fade-in">
+                    {pressCoverTypes.length > 0 ? (
+                      <>
+                        <select
+                          value={coverRequestMode ? "__request__" : coverType}
+                          onChange={(e) => {
+                            if (e.target.value === "__request__") {
+                              setCoverRequestMode(true);
+                              setCoverType("");
+                            } else {
+                              setCoverRequestMode(false);
+                              setCoverType(e.target.value);
+                            }
+                          }}
+                          className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                        >
+                          {!coverType && !coverRequestMode && (
+                            <option value="">Select a cover type...</option>
+                          )}
+                          {pressCoverTypes.map((c) => (
+                            <option key={c.id} value={c.name}>
+                              {c.name} — BDT {c.priceBdt.toLocaleString()}/cover
+                            </option>
+                          ))}
+                          <option value="__request__">Request a cover type not listed...</option>
+                        </select>
+
+                        {!coverRequestMode && selectedCoverType && (
+                          <div className="flex justify-between text-[11px] bg-white rounded-lg border border-indigo-100 px-3 py-2">
+                            <span className="text-gray-600 font-medium">{selectedCoverType.name}</span>
+                            <span className="font-extrabold text-indigo-800">
+                              + BDT {selectedCoverType.priceBdt.toLocaleString()}/cover
+                            </span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5 flex items-start gap-1.5">
+                        <HelpCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                        <span>
+                          {pressName} has not listed any cover types. You can still request one below and offer a per-cover price — the press will accept or decline.
+                        </span>
+                      </div>
+                    )}
+
+                    {coverRequestMode && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                            Requested Cover Type
+                          </label>
+                          <input
+                            type="text"
+                            value={coverRequestName}
+                            onChange={(e) => setCoverRequestName(e.target.value)}
+                            placeholder="e.g. Art Card 250gsm"
+                            className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                            required
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                            Offered Per-Cover Price (BDT)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            value={coverRequestPrice}
+                            onChange={(e) => setCoverRequestPrice(Number(e.target.value))}
+                            className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {coverRequested && (
+                      <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2">
+                        Your request will be sent to {pressName} for approval before production. If declined, your order stays on record.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

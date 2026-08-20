@@ -48,6 +48,9 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
         return { label: "Review revised proof", tab: "proofs" };
       case "Invoiced":
       case "Completed":
+        // A settled invoice has no action hint — it must not keep nudging
+        // the publisher to "pay" after the press has already marked it paid.
+        if (job.paymentStatus === "Paid") return null;
         return { label: "View & pay invoice", tab: "invoices" };
       case "Order Placed":
       case "In Production":

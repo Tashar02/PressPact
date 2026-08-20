@@ -6,18 +6,21 @@ import {
   FileText,
   Phone,
   CheckCircle2,
+  PlusCircle,
 } from "lucide-react";
 
 interface CreditHoldBannerProps {
   overdueJob: JobOrder | null;
   onOpenInvoice: (job: JobOrder) => void;
   onOpenContact: () => void;
+  onPlaceNewOrder: () => void;
 }
 
 export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
   overdueJob,
   onOpenInvoice,
   onOpenContact,
+  onPlaceNewOrder,
 }) => {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
@@ -59,6 +62,14 @@ export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
           <p className="text-xs text-green-100 leading-relaxed">
             No unpaid invoice is past the 30-day threshold, so new order placement remains fully enabled for this publisher.
           </p>
+
+          <button
+            onClick={onPlaceNewOrder}
+            className="inline-flex items-center gap-2 py-2.5 px-4 bg-white text-[#2e7d46] font-extrabold text-xs rounded-xl hover:bg-green-50 transition-colors shadow-md"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Place New Order
+          </button>
         </div>
       )}
 
