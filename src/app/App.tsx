@@ -45,6 +45,7 @@ export default function App() {
   const [jobs, setJobs] = useState<JobOrder[]>([]);
   const [stock, setStock] = useState<FilmStockItem[]>([]);
   const [publishers, setPublishers] = useState<PublisherClient[]>([]);
+  const [presses, setPresses] = useState<string[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Selected State for Modals
@@ -103,17 +104,20 @@ export default function App() {
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs] = await Promise.all([
-          jobService.fetchJobOrders(),
-          stockService.fetchFilmStock(),
-          publisherService.fetchPublishers(),
-          publisherService.fetchNotifications(),
-        ]);
+        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs, fetchedPresses] =
+          await Promise.all([
+            jobService.fetchJobOrders(),
+            stockService.fetchFilmStock(),
+            publisherService.fetchPublishers(),
+            publisherService.fetchNotifications(),
+            authService.fetchPresses(),
+          ]);
 
         setJobs(fetchedJobs || []);
         setStock(fetchedStock || []);
         setPublishers(fetchedPublishers || []);
         setNotifications(fetchedNotifs || []);
+        setPresses(fetchedPresses || []);
 
         // Real-time credit hold: check right now, not on a nightly cron.
         if (fetchedJobs && fetchedPublishers) {
@@ -594,12 +598,14 @@ export default function App() {
     coversCount: number;
     laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
     dueDate: string;
+    pressName: string;
   }) => {
     const ts = Date.now();
     const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
     const id = `#ORD-${ts}-${rand}`;
     const sessionPublisherName = currentUser?.businessName || "Unknown Publisher";
-    const sessionPressName = "Nova Lamination";
+    const sessionPressName =
+      newOrd.pressName || presses.find((p) => p.toLowerCase() === "nova lamination") || "Nova Lamination";
     const matchPub = publishers.find((p) => p.name === sessionPublisherName);
     const newJob: JobOrder = {
       id,
@@ -803,6 +809,7 @@ export default function App() {
               {activeTab === "new-order" && (
                 <NewOrderForm
                   stock={stock}
+                  presses={presses}
                   isCreditHold={isCreditHoldActive}
                   onCreateOrder={handleCreateOrder}
                   onOpenCreditHoldNotice={() => setActiveTab("credit-status")}

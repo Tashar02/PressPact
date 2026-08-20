@@ -239,4 +239,19 @@ export const authService = {
       location: profileRow?.location || userMeta.shopLocation,
     };
   },
+
+  /**
+   * Fetch every registered press (press_owner profiles) so publishers can
+   * choose which press an order goes to instead of a hardcoded default.
+   */
+  async fetchPresses(): Promise<string[]> {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("business_name")
+      .eq("role", "press_owner");
+    if (error) return [];
+    return (data || [])
+      .map((p) => p.business_name)
+      .filter((name): name is string => Boolean(name && name.trim()));
+  },
 };

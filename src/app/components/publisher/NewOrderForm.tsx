@@ -13,12 +13,14 @@ import {
 
   interface NewOrderFormProps {
   stock: FilmStockItem[];
+  presses: string[];
   isCreditHold: boolean;
   onCreateOrder: (order: {
     bookTitle: string;
     coversCount: number;
     laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
     dueDate: string;
+    pressName: string;
   }) => void;
   onOpenCreditHoldNotice: () => void;
   overdueJob?: import("../../types").JobOrder | null;
@@ -26,6 +28,7 @@ import {
 
 export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   stock,
+  presses,
   isCreditHold,
   onCreateOrder,
   onOpenCreditHoldNotice,
@@ -36,6 +39,9 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   const [laminationType, setLaminationType] = useState<
     "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte"
   >("Matte 30μm");
+  const [pressName, setPressName] = useState<string>(
+    () => presses.find((p) => p.toLowerCase() === "nova lamination") || presses[0] || "Nova Lamination"
+  );
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -61,6 +67,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
       coversCount: Number(coversCount),
       laminationType,
       dueDate,
+      pressName,
     });
 
     setSubmittedSuccess(true);
@@ -183,6 +190,26 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                 </div>
               </div>
 
+              {/* Target Press */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700">Target Lamination Press</label>
+                <select
+                  value={pressName}
+                  onChange={(e) => setPressName(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                >
+                  {presses.length > 0 ? (
+                    presses.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="Nova Lamination">Nova Lamination</option>
+                  )}
+                </select>
+              </div>
+
               {/* Lamination Finish Type */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-gray-700">
@@ -262,7 +289,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Nova Press Current Stock:</span>
+                  <span className="text-gray-500">{pressName} Current Stock:</span>
                   <span className="font-mono font-bold text-emerald-900">
                     {availableMeters.toLocaleString()} meters
                   </span>
@@ -277,7 +304,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                     Material Stock Shortage Warning!
                   </div>
                   <p className="text-[11px] leading-relaxed text-red-800">
-                    Estimated film requirement ({estimatedFilmMeters}m) exceeds available stock on hand ({availableMeters}m) at Nova Lamination. Please select a different film type or contact press owner to restock before confirming order.
+                    Estimated film requirement ({estimatedFilmMeters}m) exceeds available stock on hand ({availableMeters}m) at {pressName}. Please select a different film type or contact the press owner to restock before confirming order.
                   </p>
                 </div>
               ) : (
@@ -287,7 +314,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                     Film Coverage Stock Verified!
                   </div>
                   <p className="text-[11px] leading-relaxed text-emerald-800">
-                    Nova Lamination has sufficient film stock ({availableMeters}m available vs {estimatedFilmMeters}m required) to complete this run without stoppage.
+                    {pressName} has sufficient film stock ({availableMeters}m available vs {estimatedFilmMeters}m required) to complete this run without stoppage.
                   </p>
                 </div>
               )}
