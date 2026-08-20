@@ -82,7 +82,10 @@ export default function App() {
     restoreSession();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session?.user) {
+      // Ignore SIGNED_IN raised by sign-up: authService signs the user out
+      // immediately after creating the account, and honouring that session
+      // here would flash the dashboard for a frame before the login screen.
+      if (event === "SIGNED_IN" && session?.user && !authService.isSignUpInProgress()) {
         const profile = await authService.getCurrentUser();
         if (profile) {
           setCurrentUser(profile);

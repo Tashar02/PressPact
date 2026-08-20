@@ -16,98 +16,121 @@ export interface SignUpResult {
   needsEmailConfirmation: boolean;
 }
 
+// Raised while a sign-up is in flight. When Supabase email confirmation is off,
+// signUp() returns a live session that fires SIGNED_IN; without this guard the
+// app's auth listener would mount the dashboard for a flash before the
+// explicit sign-out below returns the user to the login tab.
+let signUpInProgress = false;
+
+async function signUpInternal(params: SignUpParams): Promise<SignUpResult> {
+  const cleanEmail = params.email.trim().toLowerCase();
+
+  const { data, error } = await supabase.auth.signUp({
+    email: cleanEmail,
+    password: params.password,
+    options: {
+      data: {
+        role: params.role,
+        fullName: params.fullName.trim(),
+        businessName: params.businessName.trim(),
+        phone: params.phone?.trim() || "",
+        shopLocation: params.location?.trim() || "",
+      },
+    },
+  });
+
+  if (error) {
+    console.error("Supabase Auth sign-up error:", error);
+    if (
+      error.message.toLowerCase().includes("already registered") ||
+      error.message.toLowerCase().includes("already exists")
+    ) {
+      throw new Error("This email is already registered. Please log in instead.");
+    }
+    throw new Error(error.message || "Registration failed. Please try again.");
+  }
+
+  // In Supabase, if an email is already registered and email confirmation is on, identities array is empty
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    throw new Error("This email is already registered. Please log in with your password.");
+  }
+
+  if (!data.user) {
+    throw new Error("Registration failed. Please try again.");
+  }
+
+  const profile: UserProfile = {
+    id: data.user.id,
+    email: cleanEmail,
+    role: params.role,
+    fullName: params.fullName.trim(),
+    businessName: params.businessName.trim(),
+    phone: params.phone?.trim(),
+    location: params.location?.trim(),
+  };
+
+  // When Supabase email confirmation is ON, session is null after sign-up.
+  // We still write the profile row but tell the caller confirmation is needed.
+  const needsEmailConfirmation = !data.session;
+
+  // To prevent auto-login behavior (Supabase automatically signs in on signup if confirm email is off),
+  // we explicitly sign out to keep the user on the login tab.
+  if (data.session) {
+    await supabase.auth.signOut();
+  }
+
+  // Ensure profile and publisher records are inserted
+  try {
+    await supabase.from("profiles").upsert({
+      id: data.user.id,
+      email: cleanEmail,
+      role: params.role,
+      full_name: params.fullName.trim(),
+      business_name: params.businessName.trim(),
+      phone: params.phone?.trim() || "",
+      location: params.location?.trim() || "",
+    });
+
+    if (params.role === "publisher") {
+      await supabase.from("publishers").upsert({
+        id: data.user.id,
+        name: params.businessName.trim(),
+        contact_person: params.fullName.trim(),
+        phone: params.phone?.trim() || "",
+        email: cleanEmail,
+        location: params.location?.trim() || "",
+        total_orders: 0,
+        outstanding_balance_bdt: 0.0,
+        oldest_overdue_days: 0,
+        credit_hold_status: false,
+      });
+    }
+  } catch (e) {
+    console.warn("Direct profile upsert sync notice:", e);
+  }
+
+  return { profile, needsEmailConfirmation };
+}
+
 export const authService = {
+  /**
+   * True while a sign-up is being processed, so the App auth listener knows a
+   * freshly created session is not a real login yet.
+   */
+  isSignUpInProgress(): boolean {
+    return signUpInProgress;
+  },
+
   /**
    * Register a new user account in Supabase Auth and initialize profile
    */
   async signUp(params: SignUpParams): Promise<SignUpResult> {
-    const cleanEmail = params.email.trim().toLowerCase();
-
-    const { data, error } = await supabase.auth.signUp({
-      email: cleanEmail,
-      password: params.password,
-      options: {
-        data: {
-          role: params.role,
-          fullName: params.fullName.trim(),
-          businessName: params.businessName.trim(),
-          phone: params.phone?.trim() || "",
-          shopLocation: params.location?.trim() || "",
-        },
-      },
-    });
-
-    if (error) {
-      console.error("Supabase Auth sign-up error:", error);
-      if (
-        error.message.toLowerCase().includes("already registered") ||
-        error.message.toLowerCase().includes("already exists")
-      ) {
-        throw new Error("This email is already registered. Please log in instead.");
-      }
-      throw new Error(error.message || "Registration failed. Please try again.");
-    }
-
-    // In Supabase, if an email is already registered and email confirmation is on, identities array is empty
-    if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
-      throw new Error("This email is already registered. Please log in with your password.");
-    }
-
-    if (!data.user) {
-      throw new Error("Registration failed. Please try again.");
-    }
-
-    const profile: UserProfile = {
-      id: data.user.id,
-      email: cleanEmail,
-      role: params.role,
-      fullName: params.fullName.trim(),
-      businessName: params.businessName.trim(),
-      phone: params.phone?.trim(),
-      location: params.location?.trim(),
-    };
-
-    // When Supabase email confirmation is ON, session is null after sign-up.
-    // We still write the profile row but tell the caller confirmation is needed.
-    const needsEmailConfirmation = !data.session;
-
-    // To prevent auto-login behavior (Supabase automatically signs in on signup if confirm email is off),
-    // we explicitly sign out to keep the user on the login tab.
-    if (data.session) {
-      await supabase.auth.signOut();
-    }
-
-    // Ensure profile and publisher records are inserted
+    signUpInProgress = true;
     try {
-      await supabase.from("profiles").upsert({
-        id: data.user.id,
-        email: cleanEmail,
-        role: params.role,
-        full_name: params.fullName.trim(),
-        business_name: params.businessName.trim(),
-        phone: params.phone?.trim() || "",
-        location: params.location?.trim() || "",
-      });
-
-      if (params.role === "publisher") {
-        await supabase.from("publishers").upsert({
-          id: data.user.id,
-          name: params.businessName.trim(),
-          contact_person: params.fullName.trim(),
-          phone: params.phone?.trim() || "",
-          email: cleanEmail,
-          location: params.location?.trim() || "",
-          total_orders: 0,
-          outstanding_balance_bdt: 0.0,
-          oldest_overdue_days: 0,
-          credit_hold_status: false,
-        });
-      }
-    } catch (e) {
-      console.warn("Direct profile upsert sync notice:", e);
+      return await signUpInternal(params);
+    } finally {
+      signUpInProgress = false;
     }
-
-    return { profile, needsEmailConfirmation };
   },
 
   /**
@@ -272,5 +295,22 @@ export const authService = {
     return (data || [])
       .map((p) => p.business_name)
       .filter((name): name is string => Boolean(name && name.trim()));
+  },
+
+  /**
+   * Fetch every press's registered shop location, keyed by business name, so
+   * invoices can print each party's full address instead of a hardcoded one.
+   */
+  async fetchPressLocations(): Promise<Record<string, string>> {
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("business_name, location")
+      .eq("role", "press_owner");
+    if (error) return {};
+    const map: Record<string, string> = {};
+    (data || []).forEach((p) => {
+      if (p.business_name) map[p.business_name] = p.location || "";
+    });
+    return map;
   },
 };
