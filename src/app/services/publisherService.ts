@@ -84,16 +84,16 @@ export const publisherService = {
   },
 
   /**
-   * Mark a notification as read
+   * Mark every notification as read
    */
-  async markNotificationRead(id: string): Promise<void> {
+  async markAllNotificationsRead(): Promise<void> {
     const { error } = await supabase
       .from("notifications")
       .update({ unread: false })
-      .eq("id", id);
+      .eq("unread", true);
 
     if (error) {
-      console.error("Error marking notification read:", error);
+      console.error("Error marking all notifications read:", error);
     }
   },
 

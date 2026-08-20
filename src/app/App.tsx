@@ -708,9 +708,10 @@ export default function App() {
           onLogout={handleLogout}
           activeTabTitle={tabTitles[activeTab] || "PressPact Portal"}
           notifications={visibleNotifications}
-          onMarkNotificationsRead={() =>
-            setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })))
-          }
+          onMarkNotificationsRead={() => {
+            setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+            publisherService.markAllNotificationsRead();
+          }}
           onSelectNotificationJob={(jobId) => {
             const match = visibleJobs.find((j) => j.id === jobId);
             if (match) setSelectedJobModal(match);
