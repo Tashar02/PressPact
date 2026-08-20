@@ -173,3 +173,46 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Business rule: a job may only enter "In Production" once the publisher has
+-- an approved proof on record (FR-1.2).
+CREATE OR REPLACE FUNCTION public.enforce_production_approval()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'In Production' AND OLD.status IS DISTINCT FROM 'In Production' THEN
+    IF NOT EXISTS (SELECT 1 FROM public.proof_logs WHERE job_id = NEW.id AND action = 'approved') THEN
+      RAISE EXCEPTION 'Cannot start production: no approved proof on record';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_production_approval ON job_orders;
+CREATE TRIGGER trg_enforce_production_approval
+  BEFORE UPDATE OF status ON job_orders
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_production_approval();
+
+-- Business rule: an invoice may only be issued on verified yield math (FR-2.2).
+CREATE OR REPLACE FUNCTION public.enforce_invoice_math()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF NEW.status = 'Invoiced' THEN
+    IF NEW.total_intake IS NULL OR NEW.good_output IS NULL OR NEW.waste_count IS NULL THEN
+      RAISE EXCEPTION 'Cannot invoice: yield and waste figures not recorded';
+    END IF;
+    IF NEW.good_output + NEW.waste_count <> NEW.total_intake THEN
+      RAISE EXCEPTION 'Cannot invoice: good output plus waste does not equal total intake';
+    END IF;
+    IF NEW.yield_verified IS NOT TRUE THEN
+      RAISE EXCEPTION 'Cannot invoice: yield math not verified';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_invoice_math ON job_orders;
+CREATE TRIGGER trg_enforce_invoice_math
+  BEFORE UPDATE OF status ON job_orders
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_invoice_math();
+

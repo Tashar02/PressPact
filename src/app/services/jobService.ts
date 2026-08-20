@@ -186,13 +186,7 @@ export const jobService = {
    * Publisher approves the quality sample proof
    */
   async approveProof(jobId: string, actorName: string, note?: string): Promise<void> {
-    const { error: updateError } = await supabase
-      .from("job_orders")
-      .update({ status: "In Production" })
-      .eq("id", jobId);
-
-    if (updateError) throw updateError;
-
+    // 1. Log the binding approval first so the production guard sees it
     const { error: logError } = await supabase.from("proof_logs").insert([
       {
         job_id: jobId,
@@ -204,19 +198,21 @@ export const jobService = {
     ]);
 
     if (logError) throw logError;
+
+    // 2. Advance the job into production
+    const { error: updateError } = await supabase
+      .from("job_orders")
+      .update({ status: "In Production" })
+      .eq("id", jobId);
+
+    if (updateError) throw updateError;
   },
 
   /**
    * Publisher rejects proof sample with feedback
    */
   async rejectProof(jobId: string, actorName: string, note: string): Promise<void> {
-    const { error: updateError } = await supabase
-      .from("job_orders")
-      .update({ status: "Proof Rejected" })
-      .eq("id", jobId);
-
-    if (updateError) throw updateError;
-
+    // 1. Log the binding rejection first
     const { error: logError } = await supabase.from("proof_logs").insert([
       {
         job_id: jobId,
@@ -228,6 +224,14 @@ export const jobService = {
     ]);
 
     if (logError) throw logError;
+
+    // 2. Hold the job out of production
+    const { error: updateError } = await supabase
+      .from("job_orders")
+      .update({ status: "Proof Rejected" })
+      .eq("id", jobId);
+
+    if (updateError) throw updateError;
   },
 
   /**

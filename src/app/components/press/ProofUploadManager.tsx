@@ -38,6 +38,10 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
   const [isSuccessToast, setIsSuccessToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Proofs may only be submitted for orders that have not entered production
+  const proofableStatuses = ["Order Placed", "Awaiting Proof", "Proof Rejected"];
+  const canUploadProof = currentJob ? proofableStatuses.includes(currentJob.status) : false;
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -49,7 +53,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentJob) return;
+    if (!currentJob || !canUploadProof) return;
 
     setIsUploading(true);
     let finalUrl = photoUrl;
@@ -63,7 +67,6 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
       setTimeout(() => setIsSuccessToast(false), 4000);
     } catch (err) {
       console.error("Proof submission error:", err);
-      onUploadProof(currentJob.id, photoUrl, note);
     } finally {
       setIsUploading(false);
     }
@@ -214,8 +217,12 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 
               <button
                 type="submit"
-                disabled={isUploading}
-                className="w-full py-3 px-4 bg-[#2e7d46] text-white font-bold text-xs rounded-xl hover:bg-[#256338] transition-colors shadow-md shadow-[#2e7d46]/20 flex items-center justify-center gap-2 disabled:opacity-75"
+                disabled={isUploading || !canUploadProof}
+                className={`w-full py-3 px-4 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
+                  canUploadProof && !isUploading
+                    ? "bg-[#2e7d46] text-white hover:bg-[#256338] shadow-[#2e7d46]/20"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none border border-gray-300"
+                }`}
               >
                 {isUploading ? (
                   <>
@@ -229,6 +236,12 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                   </>
                 )}
               </button>
+
+              {!canUploadProof && (
+                <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
+                  This order is already past proof stage and cannot accept a new proof upload.
+                </p>
+              )}
             </form>
           </div>
 
