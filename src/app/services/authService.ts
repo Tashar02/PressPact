@@ -152,6 +152,10 @@ export const authService = {
       profileRow?.role || userMeta.role || userMeta.user_role;
 
     if (storedRole && storedRole !== selectedRole) {
+      // signInWithPassword already created a session above; roll it back so a
+      // role mismatch genuinely blocks access instead of just logging an error
+      // while the auth listener signs the user in anyway (FR-5.1).
+      await supabase.auth.signOut();
       throw new Error(
         `This account is registered as a ${
           storedRole === "press_owner" ? "Press Owner" : "Publisher Client"
