@@ -1085,7 +1085,7 @@ export default function App() {
 
       {selectedInvoiceModal && (
         <InvoiceModal
-          job={selectedInvoiceModal}
+          job={jobs.find((j) => j.id === selectedInvoiceModal.id) || selectedInvoiceModal}
           onClose={() => setSelectedInvoiceModal(null)}
           onMarkPaid={(id) => handleMarkInvoicePaid(id)}
           onSubmitPayment={(id, trxId, amount) => handleSubmitBkashPayment(id, trxId, amount)}
