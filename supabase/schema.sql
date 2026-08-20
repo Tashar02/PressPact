@@ -19,15 +19,18 @@ CREATE TABLE IF NOT EXISTS publishers (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 2. Film Stock Table
+-- 2. Film Stock Table (per-press inventory, each press manages its own roll types)
 CREATE TABLE IF NOT EXISTS film_stock (
     id TEXT PRIMARY KEY,
-    type TEXT NOT NULL UNIQUE,
+    press_name TEXT NOT NULL,
+    type TEXT NOT NULL,
     available_meters NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
     roll_width_cm NUMERIC(6, 2) NOT NULL,
     min_threshold_meters NUMERIC(10, 2) NOT NULL DEFAULT 1000.00,
+    per_cover_price_bdt NUMERIC(10, 2) DEFAULT 0.00,
     last_restocked DATE DEFAULT CURRENT_DATE,
-    created_at TIMESTAMPTZ DEFAULT NOW()
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (press_name, type)
 );
 
 -- 3. Job Orders Table
@@ -65,6 +68,10 @@ CREATE TABLE IF NOT EXISTS job_orders (
     invoice_due_date TEXT,
     payment_status TEXT CHECK (payment_status IN ('Paid', 'Unpaid', 'Overdue')),
     days_overdue INT DEFAULT 0,
+    bkash_trx_id TEXT,
+    bkash_amount NUMERIC(12, 2),
+    payment_submitted_at TIMESTAMPTZ,
+    payment_note TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -180,9 +187,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- Atomically deduct film meters from stock for a film type, never going below
--- zero. Returns the updated available meters, or raises if the type is unknown.
-CREATE OR REPLACE FUNCTION public.deduct_film_stock(p_type TEXT, p_meters NUMERIC)
+-- Atomically deduct film meters from a specific press's stock for a film type,
+-- never going below zero. Returns the updated available meters, or raises if
+-- the press/type combo is unknown.
+CREATE OR REPLACE FUNCTION public.deduct_film_stock(p_press_name TEXT, p_type TEXT, p_meters NUMERIC)
 RETURNS NUMERIC AS $$
 DECLARE
   v_new_meters NUMERIC;
@@ -190,11 +198,11 @@ BEGIN
   SET search_path = public, pg_temp;
   UPDATE public.film_stock
   SET available_meters = GREATEST(0, available_meters - p_meters)
-  WHERE type = p_type
+  WHERE press_name = p_press_name AND type = p_type
   RETURNING available_meters INTO v_new_meters;
 
   IF v_new_meters IS NULL THEN
-    RAISE EXCEPTION 'Unknown film type: %', p_type;
+    RAISE EXCEPTION 'Unknown film type % for press %', p_type, p_press_name;
   END IF;
 
   RETURN v_new_meters;

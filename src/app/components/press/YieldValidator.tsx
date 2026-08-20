@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { JobOrder } from "../../types";
+import { FilmStockItem, JobOrder } from "../../types";
 import {
   Calculator,
   CheckCircle2,
@@ -8,10 +8,12 @@ import {
   Save,
   HelpCircle,
   Lock,
+  AlertCircle,
 } from "lucide-react";
 
 interface YieldValidatorProps {
   jobs: JobOrder[];
+  stock: FilmStockItem[];
   selectedJob: JobOrder | null;
   onSelectJob: (job: JobOrder) => void;
   onVerifyYield: (
@@ -20,17 +22,21 @@ interface YieldValidatorProps {
     goodOutput: number,
     wasteCount: number
   ) => Promise<void>;
-  onGenerateInvoice: (job: JobOrder, amountBdt: number) => void;
+  onGenerateInvoice: (job: JobOrder, amountBdt: number) => Promise<void>;
 }
 
 export const YieldValidator: React.FC<YieldValidatorProps> = ({
   jobs,
+  stock,
   selectedJob,
   onSelectJob,
   onVerifyYield,
   onGenerateInvoice,
 }) => {
-  const currentJob = selectedJob || jobs[0];
+  // Derive the freshest job by id so status/yield changes made in the parent
+  // (approval, invoice) are always reflected here, not a stale snapshot.
+  const selectedId = selectedJob?.id || jobs[0]?.id;
+  const currentJob = jobs.find((j) => j.id === selectedId) || selectedJob || jobs[0];
 
   const [totalIntake, setTotalIntake] = useState<number>(
     currentJob?.totalIntake ?? currentJob?.coversCount ?? 0
@@ -41,11 +47,8 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   const [wasteCount, setWasteCount] = useState<number>(
     currentJob?.wasteCount ?? 0
   );
-  const [invoiceAmount, setInvoiceAmount] = useState<number>(
-    currentJob?.amountBdt ?? 0
-  );
   const [isSaving, setIsSaving] = useState(false);
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ text: string; isError?: boolean } | null>(null);
 
   // Sync state only when the job under audit actually changes; keying on the
   // id (not the whole object) stops a parent refresh from wiping typed input.
@@ -54,10 +57,14 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
       setTotalIntake(currentJob.totalIntake ?? currentJob.coversCount ?? 0);
       setGoodOutput(currentJob.goodOutput ?? 0);
       setWasteCount(currentJob.wasteCount ?? 0);
-      setInvoiceAmount(currentJob.amountBdt ?? 0);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentJob?.id]);
+
+  const showToast = (text: string, isError = false) => {
+    setToast({ text, isError });
+    setTimeout(() => setToast(null), 4000);
+  };
 
   const calculatedSum = Number(goodOutput) + Number(wasteCount);
   const isMatched = calculatedSum === Number(totalIntake);
@@ -66,16 +73,26 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   // Once a job is invoiced its yield figures are frozen for the audit trail
   const isLocked = ["Invoiced", "Completed"].includes(currentJob?.status ?? "");
 
+  // Invoice amount is always derived, never typed: good covers x the press's
+  // per-cover price for this finish (set when the press restocks). Waste covers
+  // are never billed.
+  const pricePerCover =
+    stock.find(
+      (s) =>
+        s.type === currentJob?.laminationType &&
+        s.pressName === currentJob?.pressName
+    )?.perCoverPriceBdt ?? 0;
+  const invoiceAmount = Math.round(goodOutput * pricePerCover);
+  const priceNotSet = pricePerCover <= 0;
+
   const handleSaveDraft = async () => {
     if (!currentJob) return;
     setIsSaving(true);
     try {
       await onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
-      setToastMessage("Yield breakdown saved to job ledger draft.");
-      setTimeout(() => setToastMessage(null), 3000);
+      showToast("Yield breakdown saved to job ledger draft.");
     } catch {
-      setToastMessage("Failed to save yield breakdown. Check your connection and try again.");
-      setTimeout(() => setToastMessage(null), 3000);
+      showToast("Failed to save yield breakdown. Check your connection and try again.", true);
     } finally {
       setIsSaving(false);
     }
@@ -83,18 +100,17 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
 
   const handleInvoiceClick = async () => {
     if (!isMatched || !canInvoice || !currentJob) return;
-    if (!Number.isFinite(invoiceAmount) || invoiceAmount <= 0) {
-      setToastMessage("Enter a valid invoice amount before generating the invoice.");
-      setTimeout(() => setToastMessage(null), 3000);
+    if (priceNotSet) {
+      showToast("Set a per-cover price for this finish in Inventory before invoicing.", true);
       return;
     }
     setIsSaving(true);
     try {
       await onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
-      onGenerateInvoice(currentJob, invoiceAmount);
+      await onGenerateInvoice(currentJob, invoiceAmount);
+      showToast(`Invoice issued: BDT ${invoiceAmount.toLocaleString()} (Good covers x per-cover price).`);
     } catch {
-      setToastMessage("Failed to verify yield before invoicing. Please try again.");
-      setTimeout(() => setToastMessage(null), 3000);
+      showToast("Failed to issue the invoice. The backend rejected the yield math — verify and try again.", true);
     } finally {
       setIsSaving(false);
     }
@@ -140,10 +156,20 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
         </div>
       </div>
 
-      {toastMessage && (
-        <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in">
-          <CheckCircle2 className="w-5 h-5 text-[#2e7d46]" />
-          {toastMessage}
+      {toast && (
+        <div
+          className={`p-4 border rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in ${
+            toast.isError
+              ? "bg-red-50 border-red-300 text-red-900"
+              : "bg-emerald-50 border-emerald-300 text-emerald-900"
+          }`}
+        >
+          {toast.isError ? (
+            <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-5 h-5 text-[#2e7d46] shrink-0" />
+          )}
+          {toast.text}
         </div>
       )}
 
@@ -322,40 +348,39 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                 </div>
               )}
 
-              {/* Invoice Amount */}
+              {/* Auto Invoice Amount — derived from good covers x per-cover price */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-gray-700">
-                  Invoice Amount (BDT)
+                  Invoice Amount (Auto-calculated)
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min={1}
-                    value={invoiceAmount}
-                    disabled={isLocked}
-                    onChange={(e) => setInvoiceAmount(Number(e.target.value))}
-                    placeholder="e.g. 45000"
-                    className={`w-full pl-4 pr-16 py-2.5 bg-gray-50 border rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46] ${isLocked ? "border-gray-200 cursor-not-allowed" : "border-gray-200"}`}
-                  />
-                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">
-                    BDT
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-sm font-mono font-black text-emerald-900 flex items-center justify-between">
+                  <span>
+                    {goodOutput.toLocaleString()} good × BDT {pricePerCover.toLocaleString()} = BDT{" "}
+                    {invoiceAmount.toLocaleString()}
                   </span>
+                  <span className="text-[10px] font-sans text-emerald-700">waste never billed</span>
                 </div>
+                {priceNotSet && (
+                  <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 font-semibold flex items-start gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                    No per-cover price set for "{currentJob.laminationType}". Add a price in Inventory (Restock) before invoicing.
+                  </p>
+                )}
               </div>
             </div>
 
             {/* Invoice Button */}
             <button
               onClick={handleInvoiceClick}
-              disabled={!isMatched || !canInvoice || invoiceAmount <= 0 || isSaving}
+              disabled={!isMatched || !canInvoice || priceNotSet || isSaving}
               className={`w-full py-3.5 px-4 font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
-                isMatched && canInvoice && invoiceAmount > 0 && !isSaving
+                isMatched && canInvoice && !priceNotSet && !isSaving
                   ? "bg-[#2e7d46] text-white hover:bg-[#256338] shadow-[#2e7d46]/20 cursor-pointer"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300 shadow-none"
               }`}
             >
               <Receipt className="w-4 h-4" />
-              {isSaving ? "Saving..." : "Generate & Issue Official Invoice"}
+              {isSaving ? "Issuing Invoice..." : "Generate & Issue Official Invoice"}
             </button>
           </div>
         </div>

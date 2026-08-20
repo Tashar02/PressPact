@@ -46,6 +46,7 @@ export default function App() {
   const [stock, setStock] = useState<FilmStockItem[]>([]);
   const [publishers, setPublishers] = useState<PublisherClient[]>([]);
   const [presses, setPresses] = useState<string[]>([]);
+  const [pressLocations, setPressLocations] = useState<Record<string, string>>({});
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
   // Selected State for Modals
@@ -107,13 +108,14 @@ export default function App() {
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs, fetchedPresses] =
+        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs, fetchedPresses, fetchedPressLocations] =
           await Promise.all([
             jobService.fetchJobOrders(),
             stockService.fetchFilmStock(),
             publisherService.fetchPublishers(),
             publisherService.fetchNotifications(),
             authService.fetchPresses(),
+            authService.fetchPressLocations(),
           ]);
 
         setJobs(fetchedJobs || []);
@@ -121,6 +123,7 @@ export default function App() {
         setPublishers(fetchedPublishers || []);
         setNotifications(fetchedNotifs || []);
         setPresses(fetchedPresses || []);
+        setPressLocations(fetchedPressLocations || {});
 
         // Real-time credit hold: check right now, not on a nightly cron.
         if (fetchedJobs && fetchedPublishers) {
@@ -456,7 +459,7 @@ export default function App() {
   };
 
   // Action: Generate Invoice
-  const handleGenerateInvoice = (job: JobOrder, amountBdt: number) => {
+  const handleGenerateInvoice = async (job: JobOrder, amountBdt: number): Promise<void> => {
     const invoiceId = job.invoiceId || `INV-${new Date().getFullYear()}-${job.id.replace('#ORD-', '')}`;
     // Due date = 30 days from today — needed for real-time credit hold calculation
     const dueDate = new Date();
@@ -466,6 +469,10 @@ export default function App() {
     // Use the freshest job state so the invoice carries the verified yield figures
     const freshJob = jobs.find((j) => j.id === job.id) || job;
     const finalAmount = amountBdt || freshJob.amountBdt || 0;
+
+    // Persist first: never show an invoice the backend rejected (the DB enforces
+    // verified-yield math before the status may move to Invoiced).
+    await jobService.generateInvoice(job.id, invoiceId, finalAmount, invoiceDueDate);
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -483,11 +490,6 @@ export default function App() {
       })
     );
     setSelectedInvoiceModal({ ...freshJob, status: "Invoiced", invoiceId, amountBdt: finalAmount, invoiceDueDate });
-
-    // Persist invoice to Supabase (including due date)
-    jobService.generateInvoice(job.id, invoiceId, finalAmount, invoiceDueDate).catch((err) => {
-      console.warn("Invoice generation backend sync notice:", err.message || err);
-    });
 
     // Update publisher outstanding balance
     const matchPub = publishers.find((p) => p.name === job.publisherName);
@@ -514,18 +516,60 @@ export default function App() {
     publisherService.createNotification(notif).catch(() => {});
   };
 
-  // Action: Add Stock
-  const handleAddStock = (type: string, meters: number) => {
+  // Action: Add Stock (restock an existing roll type, optionally updating price)
+  const handleAddStock = (type: string, meters: number, perCoverPriceBdt?: number) => {
+    const today = new Date().toISOString().split("T")[0];
     setStock((prev) =>
-      prev.map((s) => (s.type === type ? { ...s, availableMeters: s.availableMeters + meters } : s))
+      prev.map((s) =>
+        s.type === type && s.pressName === currentUser?.businessName
+          ? {
+              ...s,
+              availableMeters: s.availableMeters + meters,
+              perCoverPriceBdt: perCoverPriceBdt ?? s.perCoverPriceBdt,
+              lastRestocked: today,
+            }
+          : s
+      )
     );
 
-    const matchItem = stock.find((s) => s.type === type);
+    const matchItem = stock.find(
+      (s) => s.type === type && s.pressName === currentUser?.businessName
+    );
     if (matchItem) {
-      stockService.restockItem(matchItem.id, meters).catch((err) => {
+      stockService.restockItem(matchItem.id, meters, perCoverPriceBdt).catch((err) => {
         console.warn("Stock restock backend sync notice:", err.message || err);
       });
     }
+  };
+
+  // Action: Register a brand-new roll type for this press's inventory
+  const handleAddNewRollType = (params: {
+    type: string;
+    rollWidthCm: number;
+    minThresholdMeters: number;
+    perCoverPriceBdt: number;
+    initialMeters: number;
+  }) => {
+    const today = new Date().toISOString().split("T")[0];
+    const newItem: FilmStockItem = {
+      id: `stk-${Date.now()}`,
+      type: params.type,
+      availableMeters: params.initialMeters,
+      rollWidthCm: params.rollWidthCm,
+      minThresholdMeters: params.minThresholdMeters,
+      lastRestocked: today,
+      pressName: currentUser?.businessName,
+      perCoverPriceBdt: params.perCoverPriceBdt,
+    };
+    setStock((prev) => [...prev, newItem]);
+    stockService
+      .addNewRollType({
+        pressName: currentUser?.businessName || "",
+        ...params,
+      })
+      .catch((err) => {
+        console.warn("New roll type backend sync notice:", err.message || err);
+      });
   };
 
   // Action: Mark Invoice Paid (Lift Credit Hold automatically - FR-4.4)
@@ -688,7 +732,11 @@ export default function App() {
 
   const pendingProofsCount = visibleJobs.filter((j) => j.status === "Awaiting Proof").length;
   const creditHoldCount = visiblePublishers.filter((p) => p.creditHoldStatus).length;
-  const lowStockCount = stock.filter((s) => s.availableMeters <= s.minThresholdMeters).length;
+  const lowStockCount = stock.filter(
+    (s) =>
+      s.pressName === currentUser?.businessName &&
+      s.availableMeters <= s.minThresholdMeters
+  ).length;
 
   const tabTitles: Record<string, string> = {
     dashboard: userRole === "press_owner" ? "Active Jobs Pipeline" : "My Orders Overview",
@@ -770,6 +818,7 @@ export default function App() {
               {activeTab === "yield" && (
                 <YieldValidator
                   jobs={visibleJobs}
+                  stock={stock}
                   selectedJob={selectedYieldJob}
                   onSelectJob={setSelectedYieldJob}
                   onVerifyYield={handleUpdateYield}
@@ -778,7 +827,13 @@ export default function App() {
               )}
 
               {activeTab === "stock" && (
-                <MaterialStockManager stock={stock} jobs={visibleJobs} onAddStock={handleAddStock} />
+                <MaterialStockManager
+                  stock={stock}
+                  jobs={visibleJobs}
+                  pressName={currentUser?.businessName || ""}
+                  onAddStock={handleAddStock}
+                  onAddNewType={handleAddNewRollType}
+                />
               )}
 
               {activeTab === "clients" && (
