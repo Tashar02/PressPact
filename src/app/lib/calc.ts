@@ -38,3 +38,30 @@ export function formatDateBn(iso: string): string {
   if (parts.length !== 3 || parts.some((p) => !p)) return iso;
   return `${parts[2]}-${parts[1]}-${parts[0]}`;
 }
+
+/**
+ * Format a Date as a 12-hour "hh:mm AM/PM" time (no leading zero on the hour),
+ * the convention used everywhere in the Bangladesh-facing UI.
+ */
+export function formatTimeBn(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "";
+  let hours = date.getHours();
+  const minutes = date.getMinutes();
+  const suffix = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12 || 12;
+  return `${hours}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+/**
+ * Convert a stored ISO timestamp into "DD-MM-YYYY, hh:mm AM/PM" in the user's
+ * local timezone. Falls back to DD-MM-YYYY for date-only values.
+ */
+export function formatDateTimeBn(iso: string): string {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return formatDateBn(iso);
+  const localDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+  return `${formatDateBn(localDate)}, ${formatTimeBn(date)}`;
+}

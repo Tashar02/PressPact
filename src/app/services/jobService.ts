@@ -1,8 +1,8 @@
 import { supabase } from "../lib/supabase";
-import { JobOrder, ProofLog } from "../types";
+import { JobOrder, ProofLog, BusinessLog } from "../types";
 
 // Helper mapper from Postgres snake_case columns to TypeScript JobOrder
-function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = []): JobOrder {
+function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = [], businessLogs: BusinessLog[] = []): JobOrder {
   return {
     id: row.id,
     bookTitle: row.book_title,
@@ -17,6 +17,7 @@ function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = []): JobOrder {
     status: row.status,
     estimatedFilmMeters: Number(row.estimated_film_meters),
     proofPhotoUrl: row.proof_photo_url || undefined,
+    proofPhotos: row.proof_photos || undefined,
     proofNote: row.proof_note || undefined,
     proofLogs: proofLogs,
     totalIntake: row.total_intake ? Number(row.total_intake) : undefined,
@@ -32,6 +33,14 @@ function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = []): JobOrder {
     bkashAmount: row.bkash_amount != null ? Number(row.bkash_amount) : undefined,
     paymentSubmittedAt: row.payment_submitted_at || undefined,
     paymentNote: row.payment_note || undefined,
+    paymentNotePhotoUrl: row.payment_note_photo_url || undefined,
+    coverSupply: row.cover_supply || undefined,
+    coverType: row.cover_type || undefined,
+    coverStatus: row.cover_status || undefined,
+    coverRequestPriceBdt: row.cover_request_price_bdt != null ? Number(row.cover_request_price_bdt) : undefined,
+    coverPriceBdt: row.cover_price_bdt != null ? Number(row.cover_price_bdt) : undefined,
+    createdAt: row.created_at || undefined,
+    businessLogs: businessLogs,
   };
 }
 
@@ -62,6 +71,15 @@ export const jobService = {
       console.error("Error fetching proof logs from Supabase:", logsError);
     }
 
+    const { data: bizLogs, error: bizLogsError } = await supabase
+      .from("business_logs")
+      .select("*")
+      .order("timestamp", { ascending: true });
+
+    if (bizLogsError) {
+      console.error("Error fetching business logs from Supabase:", bizLogsError);
+    }
+
     const logsByJobId: Record<string, ProofLog[]> = {};
     (logs || []).forEach((log: any) => {
       if (!logsByJobId[log.job_id]) {
@@ -69,7 +87,7 @@ export const jobService = {
       }
       logsByJobId[log.job_id].push({
         id: log.id,
-        timestamp: new Date(log.timestamp).toLocaleString(),
+        timestamp: new Date(log.timestamp).toISOString(),
         action: log.action,
         actor: log.actor,
         role: log.role,
@@ -78,17 +96,33 @@ export const jobService = {
       });
     });
 
-    return (jobs || []).map((job: any) => mapDbToJobOrder(job, logsByJobId[job.id] || []));
+    const bizLogsByJobId: Record<string, BusinessLog[]> = {};
+    (bizLogs || []).forEach((log: any) => {
+      if (!bizLogsByJobId[log.job_id]) {
+        bizLogsByJobId[log.job_id] = [];
+      }
+      bizLogsByJobId[log.job_id].push({
+        id: log.id,
+        timestamp: new Date(log.timestamp).toISOString(),
+        jobId: log.job_id,
+        actor: log.actor,
+        role: log.role,
+        action: log.action,
+        note: log.note || undefined,
+      });
+    });
+
+    return (jobs || []).map((job: any) => mapDbToJobOrder(job, logsByJobId[job.id] || [], bizLogsByJobId[job.id] || []));
   },
 
   /**
-   * Upload proof image file to Supabase Storage bucket 'proofs'.
-   * Throws when the bucket upload fails so a proof is never silently
-   * recorded with a local-only copy that the publisher cannot see.
+   * Upload one or more proof image files to Supabase Storage bucket 'proofs'.
+   * Throws when a bucket upload fails so a proof is never silently recorded
+   * with a local-only copy that the publisher cannot see.
    */
   async uploadProofImageFile(file: File, jobId: string): Promise<string> {
     const fileExt = file.name.split(".").pop() || "jpg";
-    const fileName = `${jobId.replace("#", "")}-${Date.now()}.${fileExt}`;
+    const fileName = `${jobId.replace("#", "")}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
     const filePath = `samples/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -108,6 +142,10 @@ export const jobService = {
     return data.publicUrl;
   },
 
+  async uploadProofImageFiles(files: File[], jobId: string): Promise<string[]> {
+    return Promise.all(files.map((f) => this.uploadProofImageFile(f, jobId)));
+  },
+
   /**
    * Create a new job order in Supabase
    */
@@ -124,6 +162,11 @@ export const jobService = {
       order_date: order.orderDate,
       status: order.status,
       estimated_film_meters: order.estimatedFilmMeters,
+      cover_supply: order.coverSupply || null,
+      cover_type: order.coverType || null,
+      cover_status: order.coverStatus || null,
+      cover_request_price_bdt: order.coverRequestPriceBdt ?? null,
+      cover_price_bdt: order.coverPriceBdt ?? null,
     };
 
     const { data, error } = await supabase
@@ -141,20 +184,23 @@ export const jobService = {
   },
 
   /**
-   * Upload sample proof photo and log the upload event
+   * Upload sample proof photo(s) and log the upload event. photoUrls is always
+   * an array so a press can attach multiple test-cover photos in one submit.
    */
   async uploadProof(
     jobId: string,
-    photoUrl: string,
+    photoUrls: string[],
     note: string,
     actorName: string
   ): Promise<void> {
-    // 1. Update Job Status & Proof Photo
+    const firstUrl = photoUrls[0] || "";
+    // 1. Update Job Status & Proof Photos
     const { error: updateError } = await supabase
       .from("job_orders")
       .update({
         status: "Awaiting Proof",
-        proof_photo_url: photoUrl,
+        proof_photo_url: firstUrl || null,
+        proof_photos: photoUrls.length > 0 ? photoUrls : null,
         proof_note: note,
       })
       .eq("id", jobId);
@@ -169,7 +215,7 @@ export const jobService = {
         actor: actorName,
         role: "press_owner",
         note: note,
-        photo_url: photoUrl,
+        photo_url: firstUrl || null,
       },
     ]);
 
@@ -308,13 +354,84 @@ export const jobService = {
 
   /**
    * Press responds to a bKash payment attempt (e.g. amount mismatch) with a
-   * message the publisher sees next time they open the invoice.
+   * message — and an optional proof/screenshot — the publisher sees next time
+   * they open the invoice.
    */
-  async sendPaymentMessage(jobId: string, note: string): Promise<void> {
+  async sendPaymentMessage(jobId: string, note: string, photoUrl?: string): Promise<void> {
     const { error } = await supabase
       .from("job_orders")
-      .update({ payment_note: note })
+      .update({ payment_note: note, payment_note_photo_url: photoUrl || null })
       .eq("id", jobId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Upload an image attached to a payment query (e.g. a bank/bKash screenshot)
+   * into the shared proofs bucket under a dedicated payments/ folder.
+   */
+  async uploadPaymentImageFile(file: File, jobId: string): Promise<string> {
+    const fileExt = file.name.split(".").pop() || "jpg";
+    const fileName = `${jobId.replace("#", "")}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+    const filePath = `payments/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("proofs")
+      .upload(filePath, file, {
+        cacheControl: "3600",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      throw new Error(
+        "Screenshot could not be uploaded to the shared storage bucket. Please check storage permissions and try again."
+      );
+    }
+
+    const { data } = supabase.storage.from("proofs").getPublicUrl(filePath);
+    return data.publicUrl;
+  },
+
+  /**
+   * Respond to a cover-supply request: approve (locking in the offered
+   * per-cover price) or reject. A rejection never deletes the order — the
+   * decision stays on record in the business books.
+   */
+  async respondCoverRequest(
+    jobId: string,
+    status: "approved" | "rejected",
+    priceBdt?: number
+  ): Promise<void> {
+    const { error } = await supabase
+      .from("job_orders")
+      .update({
+        cover_status: status,
+        cover_price_bdt: status === "approved" ? (priceBdt ?? null) : null,
+      })
+      .eq("id", jobId);
+
+    if (error) throw error;
+  },
+
+  /**
+   * Append an immutable entry to the business books ledger for a job.
+   */
+  async addBusinessLog(input: {
+    jobId: string;
+    actor: string;
+    role: "press_owner" | "publisher";
+    action: string;
+    note?: string;
+  }): Promise<void> {
+    const { error } = await supabase.from("business_logs").insert([
+      {
+        job_id: input.jobId,
+        actor: input.actor,
+        role: input.role,
+        action: input.action,
+        note: input.note || null,
+      },
+    ]);
 
     if (error) throw error;
   },

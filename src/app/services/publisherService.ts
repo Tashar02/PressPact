@@ -103,7 +103,7 @@ export const publisherService = {
   async createNotification(notification: {
     title: string;
     message: string;
-    type: "proof" | "yield" | "credit" | "stock" | "order";
+    type: "proof" | "yield" | "credit" | "stock" | "order" | "cover";
     jobId?: string;
   }): Promise<void> {
     const { error } = await supabase.from("notifications").insert([

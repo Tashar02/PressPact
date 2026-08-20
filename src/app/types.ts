@@ -19,6 +19,9 @@ export type JobStatus =
   | "Invoiced"
   | "Completed";
 
+export type CoverSupply = "client_supplied" | "press_purchased";
+export type CoverStatus = "requested" | "approved" | "rejected";
+
 export interface ProofLog {
   id: string;
   timestamp: string;
@@ -27,6 +30,16 @@ export interface ProofLog {
   role: UserRole;
   note?: string;
   photoUrl?: string;
+}
+
+export interface BusinessLog {
+  id: string;
+  timestamp: string;
+  jobId: string;
+  actor: string;
+  role: UserRole;
+  action: string;
+  note?: string;
 }
 
 export interface JobOrder {
@@ -45,6 +58,7 @@ export interface JobOrder {
 
   // Proof Data
   proofPhotoUrl?: string;
+  proofPhotos?: string[];
   proofNote?: string;
   proofLogs: ProofLog[];
 
@@ -66,6 +80,26 @@ export interface JobOrder {
   bkashAmount?: number;
   paymentSubmittedAt?: string;
   paymentNote?: string;
+  paymentNotePhotoUrl?: string;
+
+  // Cover Supply
+  coverSupply?: CoverSupply;
+  coverType?: string;
+  coverStatus?: CoverStatus;
+  coverRequestPriceBdt?: number;
+  coverPriceBdt?: number;
+
+  // Audit Trail & Receipt Times
+  createdAt?: string;
+  businessLogs?: BusinessLog[];
+}
+
+export interface CoverTypeItem {
+  id: string;
+  pressName: string;
+  name: string;
+  priceBdt: number;
+  description?: string;
 }
 
 export interface FilmStockItem {
@@ -97,7 +131,7 @@ export interface NotificationItem {
   timestamp: string;
   title: string;
   message: string;
-  type: "proof" | "yield" | "credit" | "stock" | "order";
+  type: "proof" | "yield" | "credit" | "stock" | "order" | "cover";
   unread: boolean;
   jobId?: string;
 }
