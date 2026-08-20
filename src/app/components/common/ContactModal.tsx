@@ -12,13 +12,14 @@ export const ContactModal: React.FC<ContactModalProps> = ({
   isOpen,
   onClose,
   targetName = "Workspace Support",
-  phone = "+880 1700-000000",
+  phone,
 }) => {
   const [copied, setCopied] = React.useState(false);
 
   if (!isOpen) return null;
 
   const handleCopy = () => {
+    if (!phone) return;
     navigator.clipboard.writeText(phone);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -46,19 +47,21 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         </div>
 
         <div className="bg-emerald-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-500 font-medium">Direct Phone:</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-extrabold text-emerald-900">{phone}</span>
-              <button
-                onClick={handleCopy}
-                className="p-1 text-[#2e7d46] hover:bg-emerald-100 rounded transition-colors"
-                title="Copy phone number"
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-              </button>
+          {phone && (
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-500 font-medium">Direct Phone:</span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-extrabold text-emerald-900">{phone}</span>
+                <button
+                  onClick={handleCopy}
+                  className="p-1 text-[#2e7d46] hover:bg-emerald-100 rounded transition-colors"
+                  title="Copy phone number"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex items-start gap-2 text-xs text-gray-700">
             <MapPin className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
@@ -72,13 +75,15 @@ export const ContactModal: React.FC<ContactModalProps> = ({
         </div>
 
         <div className="flex gap-3">
-          <a
-            href={`tel:${phone.replace(/\s+/g, "")}`}
-            className="flex-1 py-2.5 px-4 bg-[#2e7d46] text-white font-semibold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center justify-center gap-2 text-center"
-          >
-            <Phone className="w-4 h-4" />
-            Call Directly
-          </a>
+          {phone && (
+            <a
+              href={`tel:${phone.replace(/\s+/g, "")}`}
+              className="flex-1 py-2.5 px-4 bg-[#2e7d46] text-white font-semibold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center justify-center gap-2 text-center"
+            >
+              <Phone className="w-4 h-4" />
+              Call Directly
+            </a>
+          )}
           <button
             onClick={onClose}
             className="py-2.5 px-4 bg-gray-100 text-gray-700 font-semibold text-xs rounded-xl hover:bg-gray-200 transition-colors"

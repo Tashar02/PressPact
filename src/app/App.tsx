@@ -709,22 +709,16 @@ export default function App() {
               {activeTab === "dashboard" && (
                 <PressDashboard
                   jobs={visibleJobs}
-                  stock={stock}
-                  publishers={visiblePublishers}
                   onNavigateTab={setActiveTab}
                   onSelectJob={(job) => setSelectedJobModal(job)}
-                  onOpenProofUpload={(job) => {
+                  onOpenProof={(job) => {
                     setSelectedProofJob(job);
                     setActiveTab("proofs");
                   }}
-                  onOpenYieldAudit={(job) => {
+                  onOpenYield={(job) => {
                     setSelectedYieldJob(job);
                     setActiveTab("yield");
                   }}
-                  onOpenInvoice={(job) => handleGenerateInvoice(job)}
-                  onContactPublisher={(name, phone) =>
-                    setContactModalData({ isOpen: true, name, phone })
-                  }
                 />
               )}
 
@@ -755,9 +749,11 @@ export default function App() {
                 <PublisherLedger
                   publishers={visiblePublishers}
                   jobs={visibleJobs}
-                  onContact={(name, phone) =>
+                  onMarkInvoicePaid={handleMarkInvoicePaid}
+                  onOpenContact={(name, phone) =>
                     setContactModalData({ isOpen: true, name, phone })
                   }
+                  onOpenInvoice={(job) => setSelectedInvoiceModal(job)}
                 />
               )}
             </>
@@ -804,17 +800,17 @@ export default function App() {
               {activeTab === "invoices" && (
                 <VerifiedInvoiceView
                   jobs={visibleJobs.filter((j) => j.status === "Invoiced" || j.status === "Completed")}
-                  onPayInvoice={handleMarkInvoicePaid}
-                  onOpenInvoiceModal={(job) => setSelectedInvoiceModal(job)}
+                  onOpenInvoice={(job) => setSelectedInvoiceModal(job)}
                 />
               )}
 
               {activeTab === "credit-status" && (
                 <CreditHoldBanner
-                  isCreditHold={isCreditHoldActive}
                   overdueJob={overdueJob}
-                  onPayInvoice={handleMarkInvoicePaid}
-                  onOpenInvoiceModal={(job) => setSelectedInvoiceModal(job)}
+                  onOpenInvoice={(job) => setSelectedInvoiceModal(job)}
+                  onOpenContact={() =>
+                    setContactModalData({ isOpen: true, name: overdueJob?.pressName })
+                  }
                 />
               )}
             </>
@@ -928,19 +924,19 @@ export default function App() {
         <JobDetailsModal
           job={selectedJobModal}
           onClose={() => setSelectedJobModal(null)}
-          onActionProof={() => {
-            setSelectedProofJob(selectedJobModal);
+          onOpenProof={(job) => {
+            setSelectedProofJob(job);
             setSelectedJobModal(null);
             setActiveTab("proofs");
           }}
-          onActionYield={() => {
-            setSelectedYieldJob(selectedJobModal);
+          onOpenYield={(job) => {
+            setSelectedYieldJob(job);
             setSelectedJobModal(null);
             setActiveTab("yield");
           }}
-          onActionInvoice={() => {
+          onOpenInvoice={(job) => {
             setSelectedJobModal(null);
-            handleGenerateInvoice(selectedJobModal);
+            setSelectedInvoiceModal(job);
           }}
         />
       )}
@@ -949,15 +945,17 @@ export default function App() {
         <InvoiceModal
           job={selectedInvoiceModal}
           onClose={() => setSelectedInvoiceModal(null)}
-          onPayInvoice={(id) => handleMarkInvoicePaid(id)}
+          onMarkPaid={(id) => handleMarkInvoicePaid(id)}
+          isPressOwner={userRole === "press_owner"}
         />
       )}
 
       {contactModalData.isOpen && (
         <ContactModal
-          name={contactModalData.name || "Contact"}
-          phone={contactModalData.phone || "+880 1711-000000"}
+          isOpen={contactModalData.isOpen}
           onClose={() => setContactModalData({ isOpen: false })}
+          targetName={contactModalData.name || "Contact"}
+          phone={contactModalData.phone}
         />
       )}
 
