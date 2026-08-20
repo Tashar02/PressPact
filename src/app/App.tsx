@@ -59,6 +59,7 @@ export default function App() {
   const [selectedProofJob, setSelectedProofJob] = useState<JobOrder | null>(null);
   const [selectedYieldJob, setSelectedYieldJob] = useState<JobOrder | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [jobSearchQuery, setJobSearchQuery] = useState("");
 
   // 1. Session Restoration & Auth State Change Listener
   useEffect(() => {
@@ -715,6 +716,8 @@ export default function App() {
             if (match) setSelectedJobModal(match);
           }}
           onMobileMenuToggle={() => setMobileMenuOpen(!mobileMenuOpen)}
+          searchQuery={jobSearchQuery}
+          onSearchQueryChange={setJobSearchQuery}
         />
 
         <main className="flex-1 p-4 lg:p-8 max-w-7xl w-full mx-auto pb-24 lg:pb-8">
@@ -734,6 +737,8 @@ export default function App() {
                     setSelectedYieldJob(job);
                     setActiveTab("yield");
                   }}
+                  searchQuery={jobSearchQuery}
+                  onSearchQueryChange={setJobSearchQuery}
                 />
               )}
 
@@ -789,6 +794,8 @@ export default function App() {
                     setActiveTab("proofs");
                   }}
                   onOpenInvoice={(job) => setSelectedInvoiceModal(job)}
+                  searchQuery={jobSearchQuery}
+                  onSearchQueryChange={setJobSearchQuery}
                 />
               )}
 

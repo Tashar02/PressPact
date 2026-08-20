@@ -17,6 +17,8 @@ interface PressDashboardProps {
   onOpenProof: (job: JobOrder) => void;
   onOpenYield: (job: JobOrder) => void;
   onNavigateTab: (tab: string) => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 }
 
 export const PressDashboard: React.FC<PressDashboardProps> = ({
@@ -25,9 +27,10 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
   onOpenProof,
   onOpenYield,
   onNavigateTab,
+  searchQuery,
+  onSearchQueryChange,
 }) => {
   const [filterStage, setFilterStage] = useState<string>("ALL");
-  const [searchTerm, setSearchTerm] = useState("");
 
   const activeJobsCount = jobs.filter((j) => j.status !== "Completed").length;
   const pendingProofsCount = jobs.filter((j) => j.status === "Awaiting Proof").length;
@@ -57,9 +60,10 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
         : true;
 
     const matchesSearch =
-      j.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      j.bookTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      j.publisherName.toLowerCase().includes(searchTerm.toLowerCase());
+      j.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      j.bookTitle.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      j.publisherName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      j.laminationType.toLowerCase().includes(searchQuery.toLowerCase());
 
     return matchesStage && matchesSearch;
   });
@@ -163,8 +167,8 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
               <input
                 type="text"
                 placeholder="Filter orders..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchQuery}
+                onChange={(e) => onSearchQueryChange(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]/20 focus:border-[#2e7d46]"
               />
             </div>

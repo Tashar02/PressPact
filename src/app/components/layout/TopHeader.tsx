@@ -22,6 +22,8 @@ interface TopHeaderProps {
   onMarkNotificationsRead: () => void;
   onSelectNotificationJob?: (jobId: string) => void;
   onMobileMenuToggle?: () => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 }
 
 export const TopHeader: React.FC<TopHeaderProps> = ({
@@ -33,6 +35,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onMarkNotificationsRead,
   onSelectNotificationJob,
   onMobileMenuToggle,
+  searchQuery,
+  onSearchQueryChange,
 }) => {
   const [showNotifs, setShowNotifs] = useState(false);
   const unreadCount = notifications.filter((n) => n.unread).length;
@@ -74,6 +78,8 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchQueryChange(e.target.value)}
             placeholder="Search orders (#ORD-009), books, clients, or film types..."
             className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#2e7d46]/20 focus:border-[#2e7d46] transition-all text-gray-800 placeholder-gray-400"
           />

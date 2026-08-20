@@ -1,16 +1,13 @@
 import React from "react";
 import { JobOrder } from "../../types";
 import {
-  LayoutDashboard,
   FileCheck,
-  Receipt,
-  AlertTriangle,
-  PlusCircle,
   Clock,
   ChevronRight,
-  BookOpen,
+  PlusCircle,
   Eye,
-  CheckCircle2,
+  AlertTriangle,
+  Search,
 } from "lucide-react";
 
 interface PublisherDashboardProps {
@@ -21,6 +18,8 @@ interface PublisherDashboardProps {
   onSelectJob: (job: JobOrder) => void;
   onOpenProof: (job: JobOrder) => void;
   onOpenInvoice: (job: JobOrder) => void;
+  searchQuery: string;
+  onSearchQueryChange: (query: string) => void;
 }
 
 export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
@@ -31,10 +30,22 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
   onSelectJob,
   onOpenProof,
   onOpenInvoice,
+  searchQuery,
+  onSearchQueryChange,
 }) => {
   const pendingProofs = jobs.filter((j) => j.status === "Awaiting Proof");
   const inProdJobs = jobs.filter((j) => j.status === "In Production");
-  const invoicedJobs = jobs.filter((j) => j.status === "Invoiced" || j.status === "Completed");
+
+  const filteredJobs = jobs.filter((j) => {
+    const q = searchQuery.toLowerCase();
+    if (!q) return true;
+    return (
+      j.id.toLowerCase().includes(q) ||
+      j.bookTitle.toLowerCase().includes(q) ||
+      j.pressName.toLowerCase().includes(q) ||
+      j.laminationType.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -138,10 +149,21 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
 
       {/* Main Order Pipeline Table (PC Layout) */}
       <div className="bg-white rounded-2xl shadow-xs border border-green-100 overflow-hidden">
-        <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+        <div className="p-5 border-b border-gray-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <h3 className="font-extrabold text-gray-900 text-base">Active Publisher Orders Pipeline</h3>
             <p className="text-xs text-gray-500">Track real-time lamination progress &amp; delivery schedules.</p>
+          </div>
+
+          <div className="relative w-full md:w-48">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Filter orders..."
+              value={searchQuery}
+              onChange={(e) => onSearchQueryChange(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46]/20 focus:border-[#2e7d46]"
+            />
           </div>
         </div>
 
@@ -158,7 +180,14 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
-              {jobs.map((job) => (
+              {filteredJobs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-gray-400">
+                    No orders matching your search.
+                  </td>
+                </tr>
+              ) : (
+                filteredJobs.map((job) => (
                 <tr key={job.id} className="hover:bg-green-50/30 transition-colors">
                   <td className="p-4">
                     <div className="font-extrabold text-gray-900 text-sm">{job.id}</div>
@@ -221,7 +250,8 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
                     </div>
                   </td>
                 </tr>
-              ))}
+                ))
+              )}
             </tbody>
           </table>
         </div>
