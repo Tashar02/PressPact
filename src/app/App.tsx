@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import {
   UserRole,
   UserProfile,
@@ -6,6 +6,7 @@ import {
   FilmStockItem,
   PublisherClient,
   NotificationItem,
+  CoverTypeItem,
 } from "./types";
 import { supabase } from "./lib/supabase";
 import { daysPastDue, estimateFilmMeters } from "./lib/calc";
@@ -13,6 +14,7 @@ import { authService } from "./services/authService";
 import { jobService } from "./services/jobService";
 import { stockService } from "./services/stockService";
 import { publisherService } from "./services/publisherService";
+import { coverService } from "./services/coverService";
 import { DesktopSidebar } from "./components/layout/DesktopSidebar";
 import { TopHeader } from "./components/layout/TopHeader";
 import { AuthPages } from "./components/auth/AuthPages";
@@ -31,6 +33,7 @@ import { CreditHoldBanner } from "./components/publisher/CreditHoldBanner";
 import { JobDetailsModal } from "./components/common/JobDetailsModal";
 import { ContactModal } from "./components/common/ContactModal";
 import { InvoiceModal } from "./components/common/InvoiceModal";
+import { NotificationToasts } from "./components/common/NotificationToasts";
 import { DebugOverlay } from "./components/common/DebugOverlay";
 import { Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle, Loader2 } from "lucide-react";
 
@@ -44,6 +47,7 @@ export default function App() {
   // App Master Data State
   const [jobs, setJobs] = useState<JobOrder[]>([]);
   const [stock, setStock] = useState<FilmStockItem[]>([]);
+  const [coverTypes, setCoverTypes] = useState<CoverTypeItem[]>([]);
   const [publishers, setPublishers] = useState<PublisherClient[]>([]);
   const [presses, setPresses] = useState<string[]>([]);
   const [pressLocations, setPressLocations] = useState<Record<string, string>>({});
@@ -62,6 +66,11 @@ export default function App() {
   const [selectedYieldJob, setSelectedYieldJob] = useState<JobOrder | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [jobSearchQuery, setJobSearchQuery] = useState("");
+
+  // Elegant top-right notification toasts: new unread notifications that
+  // arrive during the session slide in and fade out after ~5 seconds.
+  const [toasts, setToasts] = useState<NotificationItem[]>([]);
+  const seenNotifIds = useRef<Set<string>>(new Set());
 
   // 1. Session Restoration & Auth State Change Listener
   useEffect(() => {
@@ -108,7 +117,7 @@ export default function App() {
   useEffect(() => {
     async function loadBackendData() {
       try {
-        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs, fetchedPresses, fetchedPressLocations] =
+        const [fetchedJobs, fetchedStock, fetchedPublishers, fetchedNotifs, fetchedPresses, fetchedPressLocations, fetchedCoverTypes] =
           await Promise.all([
             jobService.fetchJobOrders(),
             stockService.fetchFilmStock(),
@@ -116,10 +125,12 @@ export default function App() {
             publisherService.fetchNotifications(),
             authService.fetchPresses(),
             authService.fetchPressLocations(),
+            coverService.fetchCoverTypes(),
           ]);
 
         setJobs(fetchedJobs || []);
         setStock(fetchedStock || []);
+        setCoverTypes(fetchedCoverTypes || []);
         setPublishers(fetchedPublishers || []);
         setNotifications(fetchedNotifs || []);
         setPresses(fetchedPresses || []);
@@ -278,6 +289,24 @@ export default function App() {
     });
   }, [notifications, jobs, visiblePublishers, userRole, currentUser]);
 
+  // Surface newly-arrived notifications as top-right toasts. The first run
+  // seeds the seen-set with everything already present so pre-existing unread
+  // items don't all pop up on login; anything that appears afterwards toasts.
+  useEffect(() => {
+    if (visibleNotifications.length === 0) return;
+    if (seenNotifIds.current.size === 0) {
+      visibleNotifications.forEach((n) => seenNotifIds.current.add(n.id));
+      return;
+    }
+    const fresh = visibleNotifications.filter(
+      (n) => n.unread && !seenNotifIds.current.has(n.id)
+    );
+    if (fresh.length > 0) {
+      fresh.forEach((n) => seenNotifIds.current.add(n.id));
+      setToasts((prev) => [...prev, ...fresh]);
+    }
+  }, [visibleNotifications]);
+
   // Dynamic Credit Hold Status for logged-in Publisher
   const currentPublisherData = currentUser
     ? publishers.find((p) => p.name.toLowerCase() === currentUser.businessName.toLowerCase())
@@ -296,8 +325,8 @@ export default function App() {
     return { ...job, daysOverdue: daysPastDue(job.invoiceDueDate, today) };
   }, [visibleJobs]);
 
-  // Action: Upload Proof Photo
-  const handleUploadProof = (jobId: string, photoUrl: string, note: string) => {
+  // Action: Upload Proof Photo(s)
+  const handleUploadProof = (jobId: string, photoUrls: string[], note: string) => {
     const now = new Date().toISOString().replace("T", " ").slice(0, 16);
     const actorName = `${currentUser?.fullName || "Press Owner"} (Press Owner)`;
 
@@ -311,12 +340,13 @@ export default function App() {
             actor: actorName,
             role: "press_owner" as const,
             note: note,
-            photoUrl: photoUrl,
+            photoUrl: photoUrls[0] || undefined,
           };
           return {
             ...j,
             status: "Awaiting Proof" as const,
-            proofPhotoUrl: photoUrl,
+            proofPhotoUrl: photoUrls[0] || j.proofPhotoUrl,
+            proofPhotos: photoUrls.length > 0 ? photoUrls : j.proofPhotos,
             proofNote: note,
             proofLogs: [newLog, ...(j.proofLogs || [])],
           };
@@ -326,9 +356,18 @@ export default function App() {
     );
 
     // Sync to Supabase
-    jobService.uploadProof(jobId, photoUrl, note, actorName).catch((err) => {
+    jobService.uploadProof(jobId, photoUrls, note, actorName).catch((err) => {
       console.warn("Proof upload backend sync notice:", err.message || err);
     });
+
+    // Log the submission in the business books
+    jobService.addBusinessLog({
+      jobId,
+      actor: actorName,
+      role: "press_owner",
+      action: "proof_uploaded",
+      note: `${photoUrls.length} proof photo(s) submitted with note.`,
+    }).catch(() => {});
 
     // Add Notification (in-memory + persisted)
     const notif = {
@@ -572,6 +611,86 @@ export default function App() {
       });
   };
 
+  // Action: Register a new cover type (paper stock) the press can supply
+  const handleAddCoverType = (params: { name: string; priceBdt: number; description?: string }) => {
+    const pressName = currentUser?.businessName || "";
+    const newItem: CoverTypeItem = {
+      id: `cvr-${Date.now()}`,
+      pressName,
+      name: params.name,
+      priceBdt: params.priceBdt,
+      description: params.description,
+    };
+    setCoverTypes((prev) => [...prev, newItem]);
+    coverService
+      .addCoverType({ pressName, ...params })
+      .catch((err) => {
+        console.warn("New cover type backend sync notice:", err.message || err);
+      });
+  };
+
+  // Action: Update a cover type's per-cover price
+  const handleUpdateCoverTypePrice = (id: string, priceBdt: number) => {
+    setCoverTypes((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, priceBdt } : c))
+    );
+    coverService.updateCoverTypePrice(id, priceBdt).catch((err) => {
+      console.warn("Cover type price update notice:", err.message || err);
+    });
+  };
+
+  // Action: Press accepts or rejects a publisher's cover-supply request.
+  // A rejection never deletes the order — the decision stays in the books.
+  const handleRespondCoverRequest = (jobId: string, accepted: boolean) => {
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) return;
+    const actorName = `${currentUser?.fullName || "Press Owner"} (Press Owner)`;
+    const decision = accepted ? "approved" : "rejected";
+    const price = accepted ? job.coverRequestPriceBdt : undefined;
+
+    setJobs((prev) =>
+      prev.map((j) =>
+        j.id === jobId
+          ? {
+              ...j,
+              coverStatus: decision as "approved" | "rejected",
+              coverPriceBdt: accepted ? (price ?? j.coverRequestPriceBdt) : undefined,
+            }
+          : j
+      )
+    );
+
+    jobService.respondCoverRequest(jobId, decision, price).catch((err) => {
+      console.warn("Cover request response sync notice:", err.message || err);
+    });
+
+    jobService
+      .addBusinessLog({
+        jobId,
+        actor: actorName,
+        role: "press_owner",
+        action: accepted ? "cover_request_approved" : "cover_request_rejected",
+        note: accepted
+          ? `Accepted cover supply for ${job.coverType} at BDT ${(price ?? 0).toLocaleString()}/cover.`
+          : `Rejected cover supply request for ${job.coverType}. Order kept on record.`,
+      })
+      .catch(() => {});
+
+    const notif = {
+      id: `notif-${Date.now()}`,
+      timestamp: "Just now",
+      title: accepted ? "Cover Supply Approved ✓" : "Cover Supply Request Declined",
+      message: accepted
+        ? `${job.pressName} accepted cover supply (${job.coverType}) for ${jobId} at BDT ${(price ?? 0).toLocaleString()}/cover.`
+        : `${job.pressName} declined the cover supply request (${job.coverType}) for ${jobId}. The order stays on record.`,
+      type: "cover" as const,
+      unread: true,
+      jobId,
+    };
+    setNotifications((prev) => [notif, ...prev]);
+    publisherService.createNotification(notif).catch(() => {});
+  };
+
   // Action: Mark Invoice Paid (Lift Credit Hold automatically - FR-4.4)
   const handleMarkInvoicePaid = (jobId: string) => {
     const paidJob = jobs.find((j) => j.id === jobId);
@@ -667,11 +786,15 @@ export default function App() {
     publisherService.createNotification(notif).catch(() => {});
   };
 
-  // Action: Press replies to a bKash payment attempt with a message
-  const handleSendPaymentMessage = async (jobId: string, note: string) => {
-    await jobService.sendPaymentMessage(jobId, note);
+  // Action: Press replies to a bKash payment attempt with a message (+ optional screenshot)
+  const handleSendPaymentMessage = async (jobId: string, note: string, photoUrl?: string) => {
+    await jobService.sendPaymentMessage(jobId, note, photoUrl);
     setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, paymentNote: note } : j))
+      prev.map((j) =>
+        j.id === jobId
+          ? { ...j, paymentNote: note, paymentNotePhotoUrl: photoUrl || j.paymentNotePhotoUrl }
+          : j
+      )
     );
     const match = jobs.find((j) => j.id === jobId);
     const notif = {
@@ -694,6 +817,11 @@ export default function App() {
     laminationType: string;
     dueDate: string;
     pressName: string;
+    coverSupply?: "client_supplied" | "press_purchased";
+    coverType?: string;
+    coverStatus?: "requested" | "approved" | "rejected";
+    coverRequestPriceBdt?: number;
+    coverPriceBdt?: number;
   }) => {
     // Sequential human-friendly order id: #ORD-0000001, #ORD-0000002, ...
     // Derived from the highest existing numeric id so it is deterministic
@@ -707,6 +835,7 @@ export default function App() {
     const sessionPressName =
       newOrd.pressName || presses.find((p) => p.toLowerCase() === "nova lamination") || "Nova Lamination";
     const matchPub = publishers.find((p) => p.name === sessionPublisherName);
+    const nowIso = new Date().toISOString();
     const newJob: JobOrder = {
       id,
       bookTitle: newOrd.bookTitle,
@@ -716,10 +845,16 @@ export default function App() {
       coversCount: newOrd.coversCount,
       laminationType: newOrd.laminationType,
       dueDate: newOrd.dueDate,
-      orderDate: new Date().toISOString().split("T")[0],
+      orderDate: nowIso.split("T")[0],
+      createdAt: nowIso,
       status: "Order Placed",
       estimatedFilmMeters: estimateFilmMeters(newOrd.coversCount),
       proofLogs: [],
+      coverSupply: newOrd.coverSupply,
+      coverType: newOrd.coverType,
+      coverStatus: newOrd.coverStatus,
+      coverRequestPriceBdt: newOrd.coverRequestPriceBdt,
+      coverPriceBdt: newOrd.coverPriceBdt,
     };
 
     setJobs((prev) => [newJob, ...prev]);
@@ -732,6 +867,23 @@ export default function App() {
     stockService.deductStock(sessionPressName, newOrd.laminationType, newJob.estimatedFilmMeters).catch((err) => {
       console.warn("Stock deduction backend sync notice:", err.message || err);
     });
+
+    // Every order is entered into the business books, including the cover-supply choice
+    const coverNote =
+      newOrd.coverSupply === "press_purchased"
+        ? `Cover supply: press purchases ${newOrd.coverType || "covers"}${
+            newOrd.coverStatus === "requested"
+              ? ` (requested at BDT ${(newOrd.coverRequestPriceBdt ?? 0).toLocaleString()}/cover)`
+              : ` at BDT ${(newOrd.coverPriceBdt ?? 0).toLocaleString()}/cover`
+          }.`
+        : "Cover supply: client supplies own covers.";
+    jobService.addBusinessLog({
+      jobId: id,
+      actor: `${currentUser?.fullName || "Publisher"} (Publisher)`,
+      role: "publisher",
+      action: "order_placed",
+      note: coverNote,
+    }).catch(() => {});
 
     // Mirror the deduction locally so the stock meter stays in sync
     setStock((prev) =>
@@ -849,6 +1001,7 @@ export default function App() {
                     setSelectedYieldJob(job);
                     setActiveTab("yield");
                   }}
+                  onRespondCoverRequest={handleRespondCoverRequest}
                   searchQuery={jobSearchQuery}
                   onSearchQueryChange={setJobSearchQuery}
                 />
@@ -879,8 +1032,11 @@ export default function App() {
                   stock={stock}
                   jobs={visibleJobs}
                   pressName={currentUser?.businessName || ""}
+                  coverTypes={coverTypes.filter((c) => c.pressName === currentUser?.businessName)}
                   onAddStock={handleAddStock}
                   onAddNewType={handleAddNewRollType}
+                  onAddCoverType={handleAddCoverType}
+                  onUpdateCoverTypePrice={handleUpdateCoverTypePrice}
                 />
               )}
 
@@ -922,6 +1078,7 @@ export default function App() {
                 <NewOrderForm
                   stock={stock}
                   presses={presses}
+                  coverTypes={coverTypes}
                   isCreditHold={isCreditHoldActive}
                   onCreateOrder={handleCreateOrder}
                   onOpenCreditHoldNotice={() => setActiveTab("credit-status")}
@@ -953,6 +1110,7 @@ export default function App() {
                   onOpenContact={() =>
                     setContactModalData({ isOpen: true, name: overdueJob?.pressName })
                   }
+                  onPlaceNewOrder={() => setActiveTab("new-order")}
                 />
               )}
             </>
@@ -1089,7 +1247,8 @@ export default function App() {
           onClose={() => setSelectedInvoiceModal(null)}
           onMarkPaid={(id) => handleMarkInvoicePaid(id)}
           onSubmitPayment={(id, trxId, amount) => handleSubmitBkashPayment(id, trxId, amount)}
-          onSendMessage={(id, note) => handleSendPaymentMessage(id, note)}
+          onSendMessage={(id, note, photoUrl) => handleSendPaymentMessage(id, note, photoUrl)}
+          onUploadPaymentImage={jobService.uploadPaymentImageFile.bind(jobService)}
           isPressOwner={userRole === "press_owner"}
           pressLocation={pressLocations[selectedInvoiceModal.pressName] || ""}
           publisherLocation={
@@ -1109,6 +1268,12 @@ export default function App() {
 
       {/* Floating Debug overlay logger — dev builds only */}
       {import.meta.env.DEV && <DebugOverlay />}
+
+      {/* Top-right elegant notification toasts */}
+      <NotificationToasts
+        toasts={toasts}
+        onDismiss={(id) => setToasts((prev) => prev.filter((t) => t.id !== id))}
+      />
     </div>
   );
 }
