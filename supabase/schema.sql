@@ -173,6 +173,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+-- Atomically deduct film meters from stock for a film type, never going below
+-- zero. Returns the updated available meters, or raises if the type is unknown.
+CREATE OR REPLACE FUNCTION public.deduct_film_stock(p_type TEXT, p_meters NUMERIC)
+RETURNS NUMERIC AS $$
+DECLARE
+  v_new_meters NUMERIC;
+BEGIN
+  UPDATE public.film_stock
+  SET available_meters = GREATEST(0, available_meters - p_meters)
+  WHERE type = p_type
+  RETURNING available_meters INTO v_new_meters;
+
+  IF v_new_meters IS NULL THEN
+    RAISE EXCEPTION 'Unknown film type: %', p_type;
+  END IF;
+
+  RETURN v_new_meters;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
 -- Business rule: a job may only enter "In Production" once the publisher has
 -- an approved proof on record (FR-1.2).
 CREATE OR REPLACE FUNCTION public.enforce_production_approval()

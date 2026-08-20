@@ -634,6 +634,15 @@ export default function App() {
       console.warn("Stock deduction backend sync notice:", err.message || err);
     });
 
+    // Mirror the deduction locally so the stock meter stays in sync
+    setStock((prev) =>
+      prev.map((s) =>
+        s.type === newOrd.laminationType
+          ? { ...s, availableMeters: Math.max(0, s.availableMeters - newJob.estimatedFilmMeters) }
+          : s
+      )
+    );
+
     // Increment publisher order count
     if (matchPub) {
       setPublishers((prev) =>

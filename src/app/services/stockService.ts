@@ -31,27 +31,19 @@ export const stockService = {
   },
 
   /**
-   * Deduct meters from stock upon accepting a new order
+   * Deduct meters from stock upon accepting a new order.
+   * Uses the atomic deduct_film_stock RPC so concurrent orders can never
+   * double-spend the same meters.
    */
   async deductStock(type: string, metersToDeduct: number): Promise<void> {
-    const { data: stockItem, error: fetchError } = await supabase
-      .from("film_stock")
-      .select("id, available_meters")
-      .eq("type", type)
-      .single();
+    const { error } = await supabase.rpc("deduct_film_stock", {
+      p_type: type,
+      p_meters: metersToDeduct,
+    });
 
-    if (fetchError || !stockItem) return;
-
-    const newMeters = Math.max(0, Number(stockItem.available_meters) - metersToDeduct);
-
-    const { error: updateError } = await supabase
-      .from("film_stock")
-      .update({ available_meters: newMeters })
-      .eq("id", stockItem.id);
-
-    if (updateError) {
-      console.error("Error updating film stock:", updateError);
-      throw updateError;
+    if (error) {
+      console.error("Error deducting film stock:", error);
+      throw error;
     }
   },
 
