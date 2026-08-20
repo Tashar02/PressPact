@@ -126,8 +126,18 @@ export default function App() {
   }, [isLoggedIn]);
 
   /**
+   * Number of days an invoice is past its due date, measured today.
+   * Parses YYYY-MM-DD as a local date so day counts are timezone stable.
+   */
+  function daysPastDue(invoiceDueDate: string, today: Date): number {
+    const due = new Date(`${invoiceDueDate}T00:00:00`);
+    if (Number.isNaN(due.getTime())) return 0;
+    return Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
+  }
+
+  /**
    * Dynamically calculates whether each publisher should be on credit hold
-   * based on whether they have any Unpaid invoice whose due date is more than
+   * based on whether they have any unpaid invoice whose due date is more than
    * 30 days in the past — checked right now, at load time.
    * Updates the DB and local state only when the status has actually changed.
    */
@@ -139,23 +149,32 @@ export default function App() {
     today.setHours(0, 0, 0, 0);
 
     for (const pub of currentPublishers) {
-      const hasOverdueInvoice = currentJobs.some((j) => {
-        if (j.publisherName.toLowerCase() !== pub.name.toLowerCase()) return false;
-        if (j.paymentStatus !== "Unpaid") return false;
-        if (!j.invoiceDueDate) return false;
-        const due = new Date(j.invoiceDueDate);
-        const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-        return diffDays > 30;
-      });
+      const pubJobs = currentJobs.filter(
+        (j) => j.publisherName.toLowerCase() === pub.name.toLowerCase()
+      );
 
-      // Only touch the DB if the status has actually changed
-      if (hasOverdueInvoice !== pub.creditHoldStatus) {
+      let onHold = false;
+      let oldestOverdueDays = 0;
+      for (const j of pubJobs) {
+        if (j.paymentStatus === "Paid") continue;
+        if (!j.invoiceDueDate) continue;
+        const overdueDays = daysPastDue(j.invoiceDueDate, today);
+        if (overdueDays > 30) {
+          onHold = true;
+          oldestOverdueDays = Math.max(oldestOverdueDays, overdueDays);
+        }
+      }
+
+      // Only touch the DB if the state has actually changed
+      if (onHold !== pub.creditHoldStatus || oldestOverdueDays !== pub.oldestOverdueDays) {
         setPublishers((prev) =>
           prev.map((p) =>
-            p.id === pub.id ? { ...p, creditHoldStatus: hasOverdueInvoice } : p
+            p.id === pub.id
+              ? { ...p, creditHoldStatus: onHold, oldestOverdueDays }
+              : p
           )
         );
-        publisherService.setCreditHold(pub.id, hasOverdueInvoice).catch((err) => {
+        publisherService.setCreditHold(pub.id, onHold, oldestOverdueDays).catch((err) => {
           console.warn("Credit hold auto-sync notice:", err.message || err);
         });
       }
@@ -275,17 +294,17 @@ export default function App() {
     ? publishers.find((p) => p.name.toLowerCase() === currentUser.businessName.toLowerCase())
     : undefined;
   const isCreditHoldActive = currentPublisherData?.creditHoldStatus ?? false;
-  // Find the triggering overdue job dynamically: unpaid, has a due date, and is 30+ days past it
+  // Find the triggering overdue job dynamically: any unpaid invoice 30+ days past due
   const overdueJob = useMemo(() => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    return visibleJobs.find((j) => {
-      if (j.paymentStatus !== "Unpaid") return false;
+    const job = visibleJobs.find((j) => {
+      if (j.paymentStatus === "Paid") return false;
       if (!j.invoiceDueDate) return false;
-      const due = new Date(j.invoiceDueDate);
-      const diffDays = Math.floor((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-      return diffDays > 30;
-    }) || null;
+      return daysPastDue(j.invoiceDueDate, today) > 30;
+    });
+    if (!job || !job.invoiceDueDate) return null;
+    return { ...job, daysOverdue: daysPastDue(job.invoiceDueDate, today) };
   }, [visibleJobs]);
 
   // Action: Upload Proof Photo
@@ -528,9 +547,10 @@ export default function App() {
     const paidJob = jobs.find((j) => j.id === jobId);
     const publisherName = paidJob?.publisherName;
 
-    setJobs((prev) =>
-      prev.map((j) => (j.id === jobId ? { ...j, paymentStatus: "Paid" as const, daysOverdue: 0 } : j))
+    const updatedJobs = jobs.map((j) =>
+      j.id === jobId ? { ...j, paymentStatus: "Paid" as const, daysOverdue: 0 } : j
     );
+    setJobs(updatedJobs);
 
     // Persist payment to Supabase
     jobService.markInvoicePaid(jobId).catch((err) => {
@@ -540,23 +560,27 @@ export default function App() {
     if (publisherName) {
       const matchPub = publishers.find((p) => p.name === publisherName);
       const wasOnHold = matchPub?.creditHoldStatus ?? false;
+      const newBalance = Math.max(
+        0,
+        (matchPub?.outstandingBalanceBdt ?? 0) - (paidJob?.amountBdt ?? 0)
+      );
 
       setPublishers((prev) =>
         prev.map((p) =>
-          p.name === publisherName
-            ? { ...p, creditHoldStatus: false, oldestOverdueDays: 0, outstandingBalanceBdt: Math.max(0, p.outstandingBalanceBdt - (paidJob?.amountBdt ?? 0)) }
-            : p
+          p.name === publisherName ? { ...p, outstandingBalanceBdt: newBalance } : p
         )
       );
 
       if (matchPub) {
-        publisherService.setCreditHold(matchPub.id, false).catch((err) => {
-          console.warn("Credit hold lift backend sync notice:", err.message || err);
-        });
-        // Update outstanding balance
-        const newBalance = Math.max(0, matchPub.outstandingBalanceBdt - (paidJob?.amountBdt ?? 0));
         publisherService.updateOutstandingBalance(matchPub.id, newBalance).catch(() => {});
       }
+
+      // Re-run the automatic rule so any remaining overdue invoice keeps the
+      // hold in place; the hold only lifts when no overdue invoice is left.
+      const updatedPublishers = publishers.map((p) =>
+        p.name === publisherName ? { ...p, outstandingBalanceBdt: newBalance } : p
+      );
+      checkAndApplyCreditHolds(updatedJobs, updatedPublishers);
 
       // Only notify credit hold lift if publisher was actually on hold
       if (wasOnHold) {

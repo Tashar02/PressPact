@@ -47,13 +47,18 @@ export const publisherService = {
   },
 
   /**
-   * Toggle credit hold status for a publisher
+   * Set credit hold status and oldest overdue days for a publisher
    */
-  async setCreditHold(id: string, holdStatus: boolean): Promise<void> {
-    const { error } = await supabase
-      .from("publishers")
-      .update({ credit_hold_status: holdStatus })
-      .eq("id", id);
+  async setCreditHold(
+    id: string,
+    holdStatus: boolean,
+    oldestOverdueDays?: number
+  ): Promise<void> {
+    const updates: Record<string, unknown> = { credit_hold_status: holdStatus };
+    if (oldestOverdueDays !== undefined) {
+      updates.oldest_overdue_days = oldestOverdueDays;
+    }
+    const { error } = await supabase.from("publishers").update(updates).eq("id", id);
 
     if (error) {
       console.error("Error updating credit hold status:", error);
