@@ -20,25 +20,46 @@ export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
 }) => {
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
-      {/* Top Warning Banner */}
-      <div className="p-6 bg-red-600 text-white rounded-2xl shadow-xl space-y-3">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-            <ShieldAlert className="w-7 h-7 text-white" />
+      {/* Top Banner: red when on hold, green when in good standing */}
+      {overdueJob ? (
+        <div className="p-6 bg-red-600 text-white rounded-2xl shadow-xl space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-white/20 text-white tracking-widest">
+                SYSTEM CREDIT GOVERNANCE
+              </span>
+              <h3 className="text-xl font-black tracking-tight mt-0.5">
+                Account Placed on Credit Hold
+              </h3>
+            </div>
           </div>
-          <div>
-            <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-white/20 text-white tracking-widest">
-              SYSTEM CREDIT GOVERNANCE
-            </span>
-            <h3 className="text-xl font-black tracking-tight mt-0.5">
-              Account Placed on Credit Hold
-            </h3>
-          </div>
+          <p className="text-xs text-red-100 leading-relaxed">
+            When an invoice crosses 30 days past due, new order placement is automatically suspended by the system to maintain transparent credit terms.
+          </p>
         </div>
-        <p className="text-xs text-red-100 leading-relaxed">
-          When an invoice crosses 30 days past due, new order placement is automatically suspended by the system to maintain transparent credit terms.
-        </p>
-      </div>
+      ) : (
+        <div className="p-6 bg-[#2e7d46] text-white rounded-2xl shadow-xl space-y-3">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-7 h-7 text-white" />
+            </div>
+            <div>
+              <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-white/20 text-white tracking-widest">
+                SYSTEM CREDIT GOVERNANCE
+              </span>
+              <h3 className="text-xl font-black tracking-tight mt-0.5">
+                Account in Good Standing
+              </h3>
+            </div>
+          </div>
+          <p className="text-xs text-green-100 leading-relaxed">
+            No unpaid invoice is past the 30-day threshold, so new order placement remains fully enabled for this publisher.
+          </p>
+        </div>
+      )}
 
       {/* Credit Hold Specs Card */}
       {overdueJob && (
