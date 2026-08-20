@@ -75,5 +75,5 @@ INSERT INTO proof_logs (job_id, timestamp, action, actor, role, note, photo_url)
 -- 5. Insert Initial Notifications
 INSERT INTO notifications (timestamp, title, message, type, unread, job_id) VALUES
 (NOW() - INTERVAL '10 minutes', 'Proof Uploaded', 'Nova Lamination uploaded a test proof.', 'proof', TRUE, '#ORD-009'),
-(NOW() - INTERVAL '1 hour', 'Low Stock Alert', 'Gloss 24μm film stock (800m) is below minimum threshold (1500m).', 'stock', TRUE, NULL),
+(NOW() - INTERVAL '1 hour', 'Low Stock Alert', 'Nova Lamination Gloss 24μm film stock (800m) is below minimum threshold (1500m).', 'stock', TRUE, NULL),
 (NOW() - INTERVAL '1 day', 'Credit Hold Triggered', 'Sagorica Publications account placed on automated credit hold (33 days overdue).', 'credit', FALSE, NULL);

@@ -6,6 +6,7 @@ function mapDbToJobOrder(row: any, proofLogs: ProofLog[] = []): JobOrder {
   return {
     id: row.id,
     bookTitle: row.book_title,
+    publisherId: row.publisher_id || undefined,
     publisherName: row.publisher_name,
     pressName: row.press_name,
     pressOwnerName: row.press_owner_name,
@@ -120,9 +121,9 @@ export const jobService = {
     const dbRow = {
       id: order.id,
       book_title: order.bookTitle,
+      publisher_id: order.publisherId || null,
       publisher_name: order.publisherName,
       press_name: order.pressName,
-      press_owner_name: order.pressOwnerName || "Md. Abdur Rahim",
       covers_count: order.coversCount,
       lamination_type: order.laminationType,
       due_date: order.dueDate,

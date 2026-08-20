@@ -32,6 +32,7 @@ export interface ProofLog {
 export interface JobOrder {
   id: string;
   bookTitle: string;
+  publisherId?: string;
   publisherName: string;
   pressName: string;
   pressOwnerName?: string;  // e.g. "Md. Abdur Rahim"

@@ -7,9 +7,6 @@ import {
   PublisherClient,
   NotificationItem,
 } from "./types";
-import {
-  INITIAL_STOCK,
-} from "./mockData";
 import { supabase } from "./lib/supabase";
 import { authService } from "./services/authService";
 import { jobService } from "./services/jobService";
@@ -45,7 +42,7 @@ export default function App() {
 
   // App Master Data State
   const [jobs, setJobs] = useState<JobOrder[]>([]);
-  const [stock, setStock] = useState<FilmStockItem[]>(INITIAL_STOCK);
+  const [stock, setStock] = useState<FilmStockItem[]>([]);
   const [publishers, setPublishers] = useState<PublisherClient[]>([]);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
 
@@ -112,7 +109,7 @@ export default function App() {
         ]);
 
         setJobs(fetchedJobs || []);
-        if (fetchedStock && fetchedStock.length > 0) setStock(fetchedStock);
+        setStock(fetchedStock || []);
         setPublishers(fetchedPublishers || []);
         setNotifications(fetchedNotifs || []);
 
@@ -246,9 +243,17 @@ export default function App() {
     const userBusinessName = currentUser.businessName.toLowerCase();
 
     if (userRole === "press_owner") {
-      // Press Owner sees all notifications or those related to their jobs
+      // Press Owner only sees notifications tied to their own jobs or that
+      // reference their press or one of their publishers.
       return notifications.filter((n) => {
-        if (!n.jobId) return true; // General stock / system notifications
+        if (!n.jobId) {
+          const lowerMessage = n.message.toLowerCase();
+          const touchesPress = lowerMessage.includes(userBusinessName);
+          const touchesClient = visiblePublishers.some((p) =>
+            lowerMessage.includes(p.name.toLowerCase())
+          );
+          return touchesPress || touchesClient;
+        }
         const job = jobs.find((j) => j.id === n.jobId);
         return !job || job.pressName.toLowerCase() === userBusinessName;
       });
@@ -263,7 +268,7 @@ export default function App() {
       const job = jobs.find((j) => j.id === n.jobId);
       return job && job.publisherName.toLowerCase() === userBusinessName;
     });
-  }, [notifications, jobs, userRole, currentUser]);
+  }, [notifications, jobs, visiblePublishers, userRole, currentUser]);
 
   // Dynamic Credit Hold Status for logged-in Publisher
   const currentPublisherData = currentUser
@@ -592,12 +597,13 @@ export default function App() {
     const id = `#ORD-${ts}-${rand}`;
     const sessionPublisherName = currentUser?.businessName || "Unknown Publisher";
     const sessionPressName = "Nova Lamination";
+    const matchPub = publishers.find((p) => p.name === sessionPublisherName);
     const newJob: JobOrder = {
       id,
       bookTitle: newOrd.bookTitle,
+      publisherId: matchPub?.id,
       publisherName: sessionPublisherName,
       pressName: sessionPressName,
-      pressOwnerName: "Authorized Press Signatory",
       coversCount: newOrd.coversCount,
       laminationType: newOrd.laminationType,
       dueDate: newOrd.dueDate,
@@ -618,7 +624,6 @@ export default function App() {
     });
 
     // Increment publisher order count
-    const matchPub = publishers.find((p) => p.name === sessionPublisherName);
     if (matchPub) {
       setPublishers((prev) =>
         prev.map((p) => p.id === matchPub.id ? { ...p, totalOrders: p.totalOrders + 1 } : p)
