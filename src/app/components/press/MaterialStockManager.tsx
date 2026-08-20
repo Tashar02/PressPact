@@ -65,7 +65,7 @@ export const MaterialStockManager: React.FC<MaterialStockManagerProps> = ({
           const isLow = item.availableMeters <= item.minThresholdMeters;
           const pendingOrdersMeter = jobs
             .filter((j) => j.laminationType === item.type && j.status !== "Completed")
-            .reduce((sum, j) => sum + (j.estimatedFilmMeters || 1000), 0);
+            .reduce((sum, j) => sum + (j.estimatedFilmMeters || 0), 0);
 
           return (
             <div

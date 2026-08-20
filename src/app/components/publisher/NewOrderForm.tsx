@@ -38,7 +38,11 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
   const [laminationType, setLaminationType] = useState<
     "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte"
   >("Matte 30μm");
-  const [dueDate, setDueDate] = useState("2026-08-15");
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().split("T")[0];
+  });
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
 
   // Material Coverage Calculation
@@ -121,7 +125,7 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
             <div className="flex justify-between">
               <span className="text-red-500 font-medium">Unpaid Amount Due:</span>
               <span className="font-bold text-red-900 text-sm">
-                BDT {overdueJob ? (overdueJob.amountBdt || 45000).toLocaleString() : "0"}
+                BDT {overdueJob?.amountBdt?.toLocaleString() ?? "—"}
               </span>
             </div>
           </div>

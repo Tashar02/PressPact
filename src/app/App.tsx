@@ -425,12 +425,13 @@ export default function App() {
   };
 
   // Action: Update Yield & Waste
-  const handleUpdateYield = (
+  const handleUpdateYield = async (
     jobId: string,
     totalIntake: number,
     goodOutput: number,
     wasteCount: number
   ) => {
+    const verified = goodOutput + wasteCount === totalIntake;
     setJobs((prev) =>
       prev.map((j) => {
         if (j.id === jobId) {
@@ -439,28 +440,27 @@ export default function App() {
             totalIntake,
             goodOutput,
             wasteCount,
-            yieldVerified: goodOutput + wasteCount === totalIntake,
+            yieldVerified: verified,
           };
         }
         return j;
       })
     );
 
-    if (goodOutput + wasteCount === totalIntake) {
-      jobService.verifyYield(jobId, totalIntake, goodOutput, wasteCount).catch((err) => {
-        console.warn("Yield verification backend sync notice:", err.message || err);
-      });
-    }
+    await jobService.verifyYield(jobId, totalIntake, goodOutput, wasteCount, verified);
   };
 
   // Action: Generate Invoice
-  const handleGenerateInvoice = (job: JobOrder) => {
+  const handleGenerateInvoice = (job: JobOrder, amountBdt: number) => {
     const invoiceId = job.invoiceId || `INV-${new Date().getFullYear()}-${job.id.replace('#ORD-', '')}`;
-    const amountBdt = job.amountBdt ?? Math.round(job.coversCount * 12);
     // Due date = 30 days from today — needed for real-time credit hold calculation
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 30);
     const invoiceDueDate = dueDate.toISOString().split("T")[0];
+
+    // Use the freshest job state so the invoice carries the verified yield figures
+    const freshJob = jobs.find((j) => j.id === job.id) || job;
+    const finalAmount = amountBdt || freshJob.amountBdt || 0;
 
     setJobs((prev) =>
       prev.map((j) => {
@@ -470,24 +470,24 @@ export default function App() {
             status: "Invoiced" as const,
             paymentStatus: j.paymentStatus || ("Unpaid" as const),
             invoiceId,
-            amountBdt,
+            amountBdt: finalAmount,
             invoiceDueDate,
           };
         }
         return j;
       })
     );
-    setSelectedInvoiceModal({ ...job, status: "Invoiced", invoiceId, amountBdt, invoiceDueDate });
+    setSelectedInvoiceModal({ ...freshJob, status: "Invoiced", invoiceId, amountBdt: finalAmount, invoiceDueDate });
 
     // Persist invoice to Supabase (including due date)
-    jobService.generateInvoice(job.id, invoiceId, amountBdt, invoiceDueDate).catch((err) => {
+    jobService.generateInvoice(job.id, invoiceId, finalAmount, invoiceDueDate).catch((err) => {
       console.warn("Invoice generation backend sync notice:", err.message || err);
     });
 
     // Update publisher outstanding balance
     const matchPub = publishers.find((p) => p.name === job.publisherName);
     if (matchPub) {
-      const newBalance = matchPub.outstandingBalanceBdt + amountBdt;
+      const newBalance = matchPub.outstandingBalanceBdt + finalAmount;
       setPublishers((prev) =>
         prev.map((p) =>
           p.id === matchPub.id ? { ...p, outstandingBalanceBdt: newBalance } : p
@@ -500,7 +500,7 @@ export default function App() {
       id: `notif-${Date.now()}`,
       timestamp: "Just now",
       title: "Invoice Generated",
-      message: `Invoice ${invoiceId} for ${job.bookTitle} — ৳${amountBdt.toLocaleString()} BDT. Awaiting payment.`,
+      message: `Invoice ${invoiceId} for ${job.bookTitle} — ৳${finalAmount.toLocaleString()} BDT. Awaiting payment.`,
       type: "order" as const,
       unread: true,
       jobId: job.id,

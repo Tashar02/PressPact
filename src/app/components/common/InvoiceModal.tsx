@@ -17,10 +17,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
 }) => {
   if (!job) return null;
 
-  const total = job.totalIntake || job.coversCount;
-  const good = job.goodOutput || Math.round(total * 0.975);
-  const waste = job.wasteCount || total - good;
-  const mathMatched = good + waste === total;
+  const total = job.totalIntake ?? job.coversCount;
+  const good = job.goodOutput;
+  const waste = job.wasteCount;
+  const mathMatched = good != null && waste != null && good + waste === total;
   const isPaid = job.paymentStatus === "Paid";
   const isOverdue = job.paymentStatus === "Overdue" || (job.daysOverdue || 0) > 30;
 
@@ -108,10 +108,10 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 </td>
                 <td className="p-3 text-center font-medium text-emerald-800">{job.laminationType}</td>
                 <td className="p-3 text-right font-mono font-bold text-gray-800">
-                  {good.toLocaleString()} covers
+                  {good != null ? `${good.toLocaleString()} covers` : "—"}
                 </td>
                 <td className="p-3 text-right font-mono font-bold text-gray-900">
-                  BDT {(job.amountBdt || 45000).toLocaleString()}
+                  BDT {job.amountBdt?.toLocaleString() ?? "—"}
                 </td>
               </tr>
             </tbody>
@@ -131,20 +131,25 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-emerald-100 text-[#2e7d46] flex items-center gap-1">
                 <CheckCircle2 className="w-3 h-3" /> EQUATION MATCHED
               </span>
-            ) : (
+            ) : good != null && waste != null ? (
               <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-red-100 text-red-700 flex items-center gap-1">
                 <AlertCircle className="w-3 h-3" /> MISMATCH DETECTED
+              </span>
+            ) : (
+              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-gray-100 text-gray-600 flex items-center gap-1">
+                <AlertCircle className="w-3 h-3" /> YIELD NOT RECORDED
               </span>
             )}
           </div>
 
           <div className="font-mono text-xs bg-white p-3 rounded-lg border border-emerald-100 text-gray-800 flex items-center justify-between">
             <span>
-              {good} <span className="text-emerald-700">(Good)</span> + {waste}{" "}
-              <span className="text-amber-700">(Waste)</span> = <strong>{good + waste}</strong>
+              {good ?? "—"} <span className="text-emerald-700">(Good)</span> +{" "}
+              {waste ?? "—"} <span className="text-amber-700">(Waste)</span> ={" "}
+              <strong>{good != null && waste != null ? good + waste : "—"}</strong>
             </span>
             <span className="text-gray-500 font-sans text-[11px]">
-              Declared Total Intake: <strong>{total} covers</strong>
+              Declared Total Intake: <strong>{total ?? "—"} covers</strong>
             </span>
           </div>
 
@@ -158,13 +163,13 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
           <div>
             <p className="text-xs text-gray-400 font-medium">Total Amount Due</p>
             <p className="text-2xl font-black text-emerald-400">
-              BDT {(job.amountBdt || 45000).toLocaleString()}
+              BDT {job.amountBdt?.toLocaleString() ?? "—"}
             </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-gray-400">Due Date</p>
             <p className={`text-sm font-bold ${isOverdue && !isPaid ? "text-red-400" : "text-white"}`}>
-              {job.invoiceDueDate || "2026-06-18"}
+              {job.invoiceDueDate || "—"}
             </p>
           </div>
         </div>

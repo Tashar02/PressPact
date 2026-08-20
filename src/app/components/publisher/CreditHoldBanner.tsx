@@ -78,7 +78,7 @@ export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
               </span>
               <div className="flex justify-between py-1 border-b border-red-100">
                 <span className="text-gray-600">Invoice Due Date:</span>
-                <span className="font-bold text-red-700">{overdueJob.invoiceDueDate || "2026-06-18"}</span>
+                <span className="font-bold text-red-700">{overdueJob.invoiceDueDate || "—"}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-red-100">
                 <span className="text-gray-600">Days Past Due:</span>
@@ -89,7 +89,7 @@ export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
               <div className="flex justify-between py-1">
                 <span className="text-gray-600">Total Unpaid Amount:</span>
                 <span className="font-extrabold text-red-900 text-sm">
-                  BDT {(overdueJob.amountBdt || 45000).toLocaleString()}
+                  BDT {overdueJob.amountBdt?.toLocaleString() ?? "—"}
                 </span>
               </div>
             </div>

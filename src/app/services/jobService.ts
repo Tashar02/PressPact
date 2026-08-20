@@ -237,7 +237,8 @@ export const jobService = {
     jobId: string,
     totalIntake: number,
     goodOutput: number,
-    wasteCount: number
+    wasteCount: number,
+    isMatched: boolean
   ): Promise<void> {
     const { error } = await supabase
       .from("job_orders")
@@ -245,8 +246,7 @@ export const jobService = {
         total_intake: totalIntake,
         good_output: goodOutput,
         waste_count: wasteCount,
-        yield_verified: true,
-        status: "Invoiced",
+        yield_verified: isMatched,
       })
       .eq("id", jobId);
 

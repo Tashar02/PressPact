@@ -1,6 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
-import { Receipt, ShieldCheck, CheckCircle2, Eye, Printer } from "lucide-react";
+import { Receipt, ShieldCheck, CheckCircle2, Eye, AlertCircle } from "lucide-react";
 
 interface VerifiedInvoiceViewProps {
   jobs: JobOrder[];
@@ -57,9 +57,10 @@ export const VerifiedInvoiceView: React.FC<VerifiedInvoiceViewProps> = ({
             </thead>
             <tbody className="divide-y divide-gray-100 font-medium">
               {invoicedJobs.map((job) => {
-                const total = job.totalIntake || job.coversCount;
-                const good = job.goodOutput || Math.round(total * 0.975);
-                const waste = job.wasteCount || total - good;
+                const total = job.totalIntake ?? job.coversCount;
+                const good = job.goodOutput;
+                const waste = job.wasteCount;
+                const mathMatched = good != null && waste != null && good + waste === total;
 
                 return (
                   <tr key={job.id} className="hover:bg-green-50/30 transition-colors">
@@ -72,22 +73,29 @@ export const VerifiedInvoiceView: React.FC<VerifiedInvoiceViewProps> = ({
 
                     <td className="p-4">
                       <div className="font-mono text-xs text-gray-900">
-                        {good} <span className="text-emerald-700">(Good)</span> + {waste}{" "}
-                        <span className="text-amber-700">(Waste)</span> = <strong>{total}</strong>
+                        {good ?? "—"} <span className="text-emerald-700">(Good)</span> +{" "}
+                        {waste ?? "—"} <span className="text-amber-700">(Waste)</span> ={" "}
+                        <strong>{good != null && waste != null ? good + waste : "—"}</strong>
                       </div>
-                      <div className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 mt-0.5">
-                        <ShieldCheck className="w-3 h-3 text-[#2e7d46]" /> System Verified Matched
-                      </div>
+                      {mathMatched ? (
+                        <div className="text-[10px] text-emerald-800 font-semibold flex items-center gap-1 mt-0.5">
+                          <ShieldCheck className="w-3 h-3 text-[#2e7d46]" /> System Verified Matched
+                        </div>
+                      ) : good != null && waste != null ? (
+                        <div className="text-[10px] text-red-700 font-semibold flex items-center gap-1 mt-0.5">
+                          <AlertCircle className="w-3 h-3 text-red-600" /> Math Mismatch
+                        </div>
+                      ) : null}
                     </td>
 
                     <td className="p-4">
                       <div className="font-mono font-extrabold text-gray-900 text-sm">
-                        BDT {(job.amountBdt || 45000).toLocaleString()}
+                        BDT {job.amountBdt?.toLocaleString() ?? "—"}
                       </div>
                     </td>
 
                     <td className="p-4">
-                      <div className="text-gray-800 font-bold">{job.invoiceDueDate || "2026-06-18"}</div>
+                      <div className="text-gray-800 font-bold">{job.invoiceDueDate || "—"}</div>
                     </td>
 
                     <td className="p-4">

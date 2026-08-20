@@ -6,9 +6,7 @@ import {
   AlertTriangle,
   Receipt,
   Save,
-  BookOpen,
   HelpCircle,
-  FileText,
 } from "lucide-react";
 
 interface YieldValidatorProps {
@@ -20,8 +18,8 @@ interface YieldValidatorProps {
     totalIntake: number,
     goodOutput: number,
     wasteCount: number
-  ) => void;
-  onGenerateInvoice: (job: JobOrder) => void;
+  ) => Promise<void>;
+  onGenerateInvoice: (job: JobOrder, amountBdt: number) => void;
 }
 
 export const YieldValidator: React.FC<YieldValidatorProps> = ({
@@ -42,6 +40,10 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   const [wasteCount, setWasteCount] = useState<number>(
     currentJob?.wasteCount ?? 0
   );
+  const [invoiceAmount, setInvoiceAmount] = useState<number>(
+    currentJob?.amountBdt ?? 0
+  );
+  const [isSaving, setIsSaving] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Sync state when selected job changes
@@ -50,23 +52,47 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
       setTotalIntake(currentJob.totalIntake ?? currentJob.coversCount ?? 0);
       setGoodOutput(currentJob.goodOutput ?? 0);
       setWasteCount(currentJob.wasteCount ?? 0);
+      setInvoiceAmount(currentJob.amountBdt ?? 0);
     }
   }, [currentJob]);
 
   const calculatedSum = Number(goodOutput) + Number(wasteCount);
   const isMatched = calculatedSum === Number(totalIntake);
+  // Only jobs that completed proof approval and production may be invoiced
+  const canInvoice = currentJob?.status === "In Production";
 
-  const handleSaveDraft = () => {
+  const handleSaveDraft = async () => {
     if (!currentJob) return;
-    onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
-    setToastMessage("Yield breakdown saved to job ledger draft.");
-    setTimeout(() => setToastMessage(null), 3000);
+    setIsSaving(true);
+    try {
+      await onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
+      setToastMessage("Yield breakdown saved to job ledger draft.");
+      setTimeout(() => setToastMessage(null), 3000);
+    } catch {
+      setToastMessage("Failed to save yield breakdown. Check your connection and try again.");
+      setTimeout(() => setToastMessage(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleInvoiceClick = () => {
-    if (!isMatched || !currentJob) return;
-    onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
-    onGenerateInvoice(currentJob);
+  const handleInvoiceClick = async () => {
+    if (!isMatched || !canInvoice || !currentJob) return;
+    if (!Number.isFinite(invoiceAmount) || invoiceAmount <= 0) {
+      setToastMessage("Enter a valid invoice amount before generating the invoice.");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
+      onGenerateInvoice(currentJob, invoiceAmount);
+    } catch {
+      setToastMessage("Failed to verify yield before invoicing. Please try again.");
+      setTimeout(() => setToastMessage(null), 3000);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -264,20 +290,49 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                   </p>
                 </div>
               )}
+
+              {!canInvoice && (
+                <div className="p-3.5 bg-amber-100/70 rounded-xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2">
+                  <HelpCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                  <span>
+                    This order has not been approved for production yet. Invoicing unlocks once the publisher approves the proof and the run is in production.
+                  </span>
+                </div>
+              )}
+
+              {/* Invoice Amount */}
+              <div className="space-y-1">
+                <label className="block text-xs font-bold text-gray-700">
+                  Invoice Amount (BDT)
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={1}
+                    value={invoiceAmount}
+                    onChange={(e) => setInvoiceAmount(Number(e.target.value))}
+                    placeholder="e.g. 45000"
+                    className="w-full pl-4 pr-16 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                  />
+                  <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400">
+                    BDT
+                  </span>
+                </div>
+              </div>
             </div>
 
             {/* Invoice Button */}
             <button
               onClick={handleInvoiceClick}
-              disabled={!isMatched}
+              disabled={!isMatched || !canInvoice || invoiceAmount <= 0 || isSaving}
               className={`w-full py-3.5 px-4 font-extrabold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
-                isMatched
+                isMatched && canInvoice && invoiceAmount > 0 && !isSaving
                   ? "bg-[#2e7d46] text-white hover:bg-[#256338] shadow-[#2e7d46]/20 cursor-pointer"
                   : "bg-gray-200 text-gray-400 cursor-not-allowed border border-gray-300 shadow-none"
               }`}
             >
               <Receipt className="w-4 h-4" />
-              Generate &amp; Issue Official Invoice
+              {isSaving ? "Saving..." : "Generate & Issue Official Invoice"}
             </button>
           </div>
         </div>
