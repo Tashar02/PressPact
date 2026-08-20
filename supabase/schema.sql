@@ -33,7 +33,29 @@ CREATE TABLE IF NOT EXISTS film_stock (
     UNIQUE (press_name, type)
 );
 
--- 3. Job Orders Table
+-- 3. Cover Types Table (per-press paper stock the press can supply)
+CREATE TABLE IF NOT EXISTS cover_types (
+    id TEXT PRIMARY KEY,
+    press_name TEXT NOT NULL,
+    name TEXT NOT NULL,
+    price_bdt NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+    description TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE (press_name, name)
+);
+
+-- 3b. Business Logs Table (immutable ledger: every business action is recorded)
+CREATE TABLE IF NOT EXISTS business_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    job_id TEXT NOT NULL REFERENCES job_orders(id) ON DELETE CASCADE,
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    actor TEXT NOT NULL,
+    role TEXT NOT NULL CHECK (role IN ('press_owner', 'publisher')),
+    action TEXT NOT NULL,
+    note TEXT
+);
+
+-- 4. Job Orders Table
 CREATE TABLE IF NOT EXISTS job_orders (
     id TEXT PRIMARY KEY,
     book_title TEXT NOT NULL,
@@ -72,6 +94,13 @@ CREATE TABLE IF NOT EXISTS job_orders (
     bkash_amount NUMERIC(12, 2),
     payment_submitted_at TIMESTAMPTZ,
     payment_note TEXT,
+    payment_note_photo_url TEXT,
+    proof_photos TEXT[],
+    cover_supply TEXT CHECK (cover_supply IN ('client_supplied', 'press_purchased')),
+    cover_type TEXT,
+    cover_status TEXT CHECK (cover_status IN ('requested', 'approved', 'rejected')),
+    cover_request_price_bdt NUMERIC(12, 2),
+    cover_price_bdt NUMERIC(12, 2),
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -93,7 +122,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     timestamp TIMESTAMPTZ DEFAULT NOW(),
     title TEXT NOT NULL,
     message TEXT NOT NULL,
-    type TEXT NOT NULL CHECK (type IN ('proof', 'yield', 'credit', 'stock', 'order')),
+    type TEXT NOT NULL CHECK (type IN ('proof', 'yield', 'credit', 'stock', 'order', 'cover')),
     unread BOOLEAN DEFAULT TRUE,
     job_id TEXT
 );
@@ -175,6 +204,8 @@ CREATE INDEX IF NOT EXISTS idx_job_orders_publisher_id ON job_orders(publisher_i
 CREATE INDEX IF NOT EXISTS idx_proof_logs_job_id ON proof_logs(job_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(unread);
 CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
+CREATE INDEX IF NOT EXISTS idx_business_logs_job_id ON business_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_cover_types_press ON cover_types(press_name);
 
 -- Helper function to atomically increment a publisher's total_orders count
 CREATE OR REPLACE FUNCTION increment_publisher_orders(pub_id TEXT)
