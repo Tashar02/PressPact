@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FilmStockItem, JobOrder } from "../../types";
+import { FilmStockItem, JobOrder, CoverTypeItem } from "../../types";
 import {
   Layers,
   AlertTriangle,
@@ -7,12 +7,15 @@ import {
   Package,
   PlusCircle,
   X,
+  BookOpen,
+  Pencil,
 } from "lucide-react";
 
 interface MaterialStockManagerProps {
   stock: FilmStockItem[];
   jobs: JobOrder[];
   pressName: string;
+  coverTypes: CoverTypeItem[];
   onAddStock: (type: string, meters: number, perCoverPriceBdt?: number) => void;
   onAddNewType: (params: {
     type: string;
@@ -21,14 +24,19 @@ interface MaterialStockManagerProps {
     perCoverPriceBdt: number;
     initialMeters: number;
   }) => void;
+  onAddCoverType: (params: { name: string; priceBdt: number; description?: string }) => void;
+  onUpdateCoverTypePrice: (id: string, priceBdt: number) => void;
 }
 
 export const MaterialStockManager: React.FC<MaterialStockManagerProps> = ({
   stock,
   jobs,
   pressName,
+  coverTypes,
   onAddStock,
   onAddNewType,
+  onAddCoverType,
+  onUpdateCoverTypePrice,
 }) => {
   const myStock = stock.filter((s) => s.pressName === pressName);
 
@@ -40,6 +48,14 @@ export const MaterialStockManager: React.FC<MaterialStockManagerProps> = ({
   const [newTypeName, setNewTypeName] = useState("");
   const [newRollWidth, setNewRollWidth] = useState(72);
   const [newThreshold, setNewThreshold] = useState(1000);
+
+  // Cover type form state
+  const [showCoverForm, setShowCoverForm] = useState(false);
+  const [coverName, setCoverName] = useState("");
+  const [coverPrice, setCoverPrice] = useState<number>(0);
+  const [coverDescription, setCoverDescription] = useState("");
+  const [editingCoverId, setEditingCoverId] = useState<string | null>(null);
+  const [editingPrice, setEditingPrice] = useState<number>(0);
 
   const openModal = (asNew: boolean) => {
     setIsNewType(asNew);
@@ -72,6 +88,25 @@ export const MaterialStockManager: React.FC<MaterialStockManagerProps> = ({
       onAddStock(selectedType, Number(addMeters), Number(pricePerCover) || undefined);
     }
     setShowAddModal(false);
+  };
+
+  const handleAddCoverType = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!coverName.trim()) return;
+    onAddCoverType({
+      name: coverName.trim(),
+      priceBdt: Number(coverPrice) || 0,
+      description: coverDescription.trim() || undefined,
+    });
+    setCoverName("");
+    setCoverPrice(0);
+    setCoverDescription("");
+    setShowCoverForm(false);
+  };
+
+  const handleSaveCoverPrice = (id: string) => {
+    onUpdateCoverTypePrice(id, Number(editingPrice) || 0);
+    setEditingCoverId(null);
   };
 
   return (
@@ -205,6 +240,158 @@ export const MaterialStockManager: React.FC<MaterialStockManagerProps> = ({
           })}
         </div>
       )}
+
+      {/* Cover Types (Paper Stock the Press Can Supply) */}
+      <div className="bg-white rounded-2xl shadow-xs border border-indigo-100 overflow-hidden">
+        <div className="p-5 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h4 className="font-extrabold text-gray-900 text-base flex items-center gap-2">
+              <BookOpen className="w-5 h-5 text-indigo-600" />
+              Cover Types {pressName} Can Supply
+            </h4>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Paper stock you are willing to source. Publishers can pick these directly on an order, or request a new one for your approval.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCoverForm(!showCoverForm)}
+            className="py-2 px-4 bg-indigo-700 text-white font-extrabold text-xs rounded-xl hover:bg-indigo-800 transition-colors shadow-md flex items-center gap-2"
+          >
+            <PlusCircle className="w-4 h-4" />
+            Add Cover Type
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {showCoverForm && (
+            <form
+              onSubmit={handleAddCoverType}
+              className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-3"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                    Cover Type Name
+                  </label>
+                  <input
+                    type="text"
+                    value={coverName}
+                    onChange={(e) => setCoverName(e.target.value)}
+                    placeholder="e.g. Art Card 300gsm"
+                    className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                    Per-Cover Price (BDT)
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    value={coverPrice}
+                    onChange={(e) => setCoverPrice(Number(e.target.value))}
+                    className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                    Description (optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={coverDescription}
+                    onChange={(e) => setCoverDescription(e.target.value)}
+                    placeholder="e.g. Single-sided coated"
+                    className="w-full p-2.5 bg-white border border-indigo-200 rounded-xl text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="py-2 px-4 bg-indigo-700 text-white font-bold text-xs rounded-xl hover:bg-indigo-800 transition-colors"
+                >
+                  Save Cover Type
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCoverForm(false)}
+                  className="py-2 px-4 bg-gray-100 text-gray-700 font-semibold text-xs rounded-xl hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
+
+          {coverTypes.length === 0 ? (
+            <div className="p-8 text-center border border-dashed border-indigo-300 rounded-xl">
+              <BookOpen className="w-8 h-8 mx-auto text-indigo-300" />
+              <p className="font-bold text-gray-700 mt-2 text-sm">No cover types configured</p>
+              <p className="text-xs text-gray-500 mt-1">
+                Add cover types to let publishers choose "press purchases covers" directly, or they can still request a type you haven't listed.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {coverTypes.map((c) => (
+                <div
+                  key={c.id}
+                  className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/30 space-y-2"
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-extrabold text-gray-900 text-sm">{c.name}</p>
+                      {c.description && (
+                        <p className="text-[11px] text-gray-500 mt-0.5">{c.description}</p>
+                      )}
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-extrabold">
+                      BDT {c.priceBdt.toLocaleString()}/cover
+                    </span>
+                  </div>
+
+                  {editingCoverId === c.id ? (
+                    <div className="flex gap-2 pt-1">
+                      <input
+                        type="number"
+                        min={0}
+                        value={editingPrice}
+                        onChange={(e) => setEditingPrice(Number(e.target.value))}
+                        className="flex-1 p-2 bg-white border border-indigo-200 rounded-lg text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <button
+                        onClick={() => handleSaveCoverPrice(c.id)}
+                        className="px-3 py-1.5 bg-indigo-700 text-white font-bold text-xs rounded-lg hover:bg-indigo-800"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingCoverId(null)}
+                        className="px-3 py-1.5 bg-gray-100 text-gray-700 font-semibold text-xs rounded-lg"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setEditingCoverId(c.id);
+                        setEditingPrice(c.priceBdt);
+                      }}
+                      className="text-[11px] text-indigo-700 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <Pencil className="w-3 h-3" /> Update price
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Restock / Add New Type Modal */}
       {showAddModal && (

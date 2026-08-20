@@ -4,7 +4,6 @@ import { jobService } from "../../services/jobService";
 import {
   Upload,
   FileCheck,
-  Image as ImageIcon,
   CheckCircle2,
   XCircle,
   Clock,
@@ -18,7 +17,7 @@ interface ProofUploadManagerProps {
   jobs: JobOrder[];
   selectedJob: JobOrder | null;
   onSelectJob: (job: JobOrder) => void;
-  onUploadProof: (jobId: string, photoUrl: string, note: string) => void;
+  onUploadProof: (jobId: string, photoUrls: string[], note: string) => void;
 }
 
 export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
@@ -31,11 +30,11 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 // parent-side updates instead of a stale selection snapshot.
   const selectedId = selectedJob?.id || jobs[0]?.id;
   const currentJob = jobs.find((j) => j.id === selectedId) || selectedJob || jobs[0];
-  const [photoUrl, setPhotoUrl] = useState(
-    currentJob?.proofPhotoUrl || ""
+  const [photoUrls, setPhotoUrls] = useState<string[]>(
+    currentJob?.proofPhotos?.length ? currentJob.proofPhotos : currentJob?.proofPhotoUrl ? [currentJob.proofPhotoUrl] : []
   );
   const [note, setNote] = useState(currentJob?.proofNote || "");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isSuccessToast, setIsSuccessToast] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -44,29 +43,41 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
   // Proofs may only be submitted for orders that have not entered production
   const proofableStatuses = ["Order Placed", "Awaiting Proof", "Proof Rejected"];
   const canUploadProof = currentJob ? proofableStatuses.includes(currentJob.status) : false;
+  // Once a proof is pending the publisher's sign-off, the submit button must
+  // disappear from the flow so a proof can't be silently re-submitted. It only
+  // re-enables when the publisher has rejected the proof (revised proof flow).
+  const hasPendingProof =
+    currentJob?.status === "Awaiting Proof" &&
+    (currentJob.proofLogs || []).some((l) => l.action === "uploaded");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      const localPreview = URL.createObjectURL(file);
-      setPhotoUrl(localPreview);
-    }
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setSelectedFiles((prev) => [...prev, ...files]);
+    const previews = files.map((f) => URL.createObjectURL(f));
+    setPhotoUrls((prev) => [...prev, ...previews]);
+    e.target.value = "";
+  };
+
+  const removePhoto = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setPhotoUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!currentJob || !canUploadProof) return;
+    if (!currentJob || !canUploadProof || hasPendingProof) return;
 
     setIsUploading(true);
     setErrorMessage(null);
-    let finalUrl = photoUrl;
+    let finalUrls: string[] = photoUrls;
 
     try {
-      if (selectedFile) {
-        finalUrl = await jobService.uploadProofImageFile(selectedFile, currentJob.id);
+      if (selectedFiles.length > 0) {
+        finalUrls = await jobService.uploadProofImageFiles(selectedFiles, currentJob.id);
       }
-      onUploadProof(currentJob.id, finalUrl, note);
+      onUploadProof(currentJob.id, finalUrls, note);
+      setSelectedFiles([]);
       setIsSuccessToast(true);
       setTimeout(() => setIsSuccessToast(false), 4000);
     } catch (err) {
@@ -106,9 +117,15 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
               const found = jobs.find((j) => j.id === e.target.value);
               if (found) {
                 onSelectJob(found);
-                setPhotoUrl(found.proofPhotoUrl || "");
+                setPhotoUrls(
+                  found.proofPhotos?.length
+                    ? found.proofPhotos
+                    : found.proofPhotoUrl
+                    ? [found.proofPhotoUrl]
+                    : []
+                );
                 setNote(found.proofNote || "");
-                setSelectedFile(null);
+                setSelectedFiles([]);
               }
             }}
             className="w-full text-xs font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
@@ -180,6 +197,7 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                   ref={fileInputRef}
                   onChange={handleFileChange}
                   accept="image/*"
+                  multiple
                   className="hidden"
                 />
 
@@ -187,26 +205,49 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                   onClick={() => fileInputRef.current?.click()}
                   className="relative group border-2 border-dashed border-green-200 rounded-2xl p-4 bg-green-50/40 text-center hover:border-[#2e7d46] transition-colors cursor-pointer"
                 >
-                  {photoUrl ? (
-                    <div className="relative overflow-hidden rounded-xl h-56 bg-gray-900">
-                      <img
-                        src={photoUrl}
-                        alt="Test proof"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end justify-between p-3">
-                        <span className="text-xs text-white font-medium flex items-center gap-1">
-                          <ImageIcon className="w-3.5 h-3.5" /> Sample Lamination Output
-                        </span>
-                        <span className="text-[10px] text-emerald-300 font-bold bg-black/40 px-2 py-0.5 rounded-full">
-                          Click to Change Photo
-                        </span>
+                  {photoUrls.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="grid grid-cols-2 gap-2">
+                        {photoUrls.map((url, idx) => (
+                          <div
+                            key={`${url}-${idx}`}
+                            className="relative overflow-hidden rounded-xl h-40 bg-gray-900"
+                          >
+                            <img
+                              src={url}
+                              alt={`Test proof ${idx + 1}`}
+                              className="w-full h-full object-cover"
+                            />
+                            {idx === 0 && (
+                              <span className="absolute top-2 left-2 text-[9px] font-black bg-black/60 text-white px-1.5 py-0.5 rounded-full">
+                                MAIN
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(ev) => {
+                                ev.stopPropagation();
+                                removePhoto(idx);
+                              }}
+                              className="absolute top-2 right-2 p-1 rounded-full bg-black/60 text-white hover:bg-red-600 transition-colors"
+                              title="Remove photo"
+                            >
+                              <XCircle className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        ))}
                       </div>
+                      <span className="inline-block text-[10px] text-emerald-700 font-bold bg-black/40 px-2 py-0.5 rounded-full">
+                        Click to add more photos
+                      </span>
                     </div>
                   ) : (
                     <div className="py-12 text-gray-400 space-y-2">
                       <Upload className="w-8 h-8 mx-auto text-green-600" />
-                      <p className="text-xs font-bold text-gray-600">Click to capture or attach photo</p>
+                      <p className="text-xs font-bold text-gray-600">
+                        Click to capture or attach one or more photos
+                      </p>
+                      <p className="text-[10px] text-gray-400">Multiple test-cover photos supported — optional</p>
                     </div>
                   )}
                 </div>
@@ -229,9 +270,9 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
 
               <button
                 type="submit"
-                disabled={isUploading || !canUploadProof}
+                disabled={isUploading || !canUploadProof || hasPendingProof}
                 className={`w-full py-3 px-4 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 ${
-                  canUploadProof && !isUploading
+                  canUploadProof && !isUploading && !hasPendingProof
                     ? "bg-[#2e7d46] text-white hover:bg-[#256338] shadow-[#2e7d46]/20"
                     : "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none border border-gray-300"
                 }`}
@@ -239,17 +280,23 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
                 {isUploading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Uploading Sample Photo...</span>
+                    <span>Uploading Sample Photos...</span>
                   </>
                 ) : (
                   <>
                     <Send className="w-4 h-4" />
-                    <span>Submit Proof &amp; Request Publisher Sign-Off</span>
+                    <span>{hasPendingProof ? "Proof Submitted — Awaiting Publisher Sign-Off" : "Submit Proof &amp; Request Publisher Sign-Off"}</span>
                   </>
                 )}
               </button>
 
-              {!canUploadProof && (
+              {hasPendingProof && (
+                <p className="text-[11px] text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-2.5">
+                  This proof is already submitted and waiting for the publisher&apos;s review. The submit action is locked until the publisher requests a revision.
+                </p>
+              )}
+
+              {!canUploadProof && !hasPendingProof && (
                 <p className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
                   This order is already past proof stage and cannot accept a new proof upload.
                 </p>

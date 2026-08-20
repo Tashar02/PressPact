@@ -10,6 +10,9 @@ import {
   Eye,
   Search,
   ChevronRight,
+  Package,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
 
 interface PressDashboardProps {
@@ -18,6 +21,7 @@ interface PressDashboardProps {
   onOpenProof: (job: JobOrder) => void;
   onOpenYield: (job: JobOrder) => void;
   onNavigateTab: (tab: string) => void;
+  onRespondCoverRequest: (jobId: string, accepted: boolean) => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
 }
@@ -28,6 +32,7 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
   onOpenProof,
   onOpenYield,
   onNavigateTab,
+  onRespondCoverRequest,
   searchQuery,
   onSearchQueryChange,
 }) => {
@@ -55,6 +60,7 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
   const activeJobsCount = jobs.filter((j) => j.status !== "Completed").length;
   const pendingProofsCount = jobs.filter((j) => j.status === "Awaiting Proof").length;
   const pendingYieldCount = jobs.filter((j) => j.status === "In Production").length;
+  const coverRequests = jobs.filter((j) => j.coverStatus === "requested");
 
   // An invoice is "overdue" the moment it crosses 30 days past due, whether it
   // was stored as Unpaid or Overdue — the same rule the credit hold uses.
@@ -168,6 +174,62 @@ export const PressDashboard: React.FC<PressDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Cover Supply Requests Awaiting Decision */}
+      {coverRequests.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-xs border border-indigo-200 overflow-hidden animate-in fade-in">
+          <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="w-5 h-5 text-indigo-600" />
+              <h3 className="font-extrabold text-gray-900 text-base">
+                Cover Supply Requests Awaiting Your Decision
+              </h3>
+              <span className="px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-extrabold">
+                {coverRequests.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-gray-50">
+            {coverRequests.map((job) => (
+              <div key={job.id} className="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="font-extrabold text-gray-900 text-sm">{job.id}</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 text-[10px] font-extrabold">
+                      COVER REQUESTED
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-600 font-medium">{job.bookTitle}</p>
+                  <p className="text-[11px] text-gray-500">
+                    <strong className="text-indigo-800">{job.coverType}</strong> · Client:{" "}
+                    {job.publisherName} · Offered{" "}
+                    <span className="font-mono font-bold text-gray-900">
+                      BDT {(job.coverRequestPriceBdt ?? 0).toLocaleString()}/cover
+                    </span>
+                  </p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => onRespondCoverRequest(job.id, true)}
+                    className="py-2 px-4 bg-[#2e7d46] text-white font-bold text-xs rounded-xl hover:bg-[#256338] transition-colors flex items-center gap-1.5 shadow-md"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    Accept &amp; Proceed
+                  </button>
+                  <button
+                    onClick={() => onRespondCoverRequest(job.id, false)}
+                    className="py-2 px-4 bg-white border-2 border-red-500 text-red-600 font-bold text-xs rounded-xl hover:bg-red-50 transition-colors flex items-center gap-1.5"
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Reject (Keep Order)
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Main Data Table Section (PC Layout) */}
       <div className="bg-white rounded-2xl shadow-xs border border-green-100 overflow-hidden">

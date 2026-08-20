@@ -74,15 +74,17 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
   const isLocked = ["Invoiced", "Completed"].includes(currentJob?.status ?? "");
 
   // Invoice amount is always derived, never typed: good covers x the press's
-  // per-cover price for this finish (set when the press restocks). Waste covers
-  // are never billed.
+  // per-cover price for this finish (set when the press restocks), plus good
+  // covers x the cover-supply price when the press sourced the covers. Waste
+  // covers are never billed.
   const pricePerCover =
     stock.find(
       (s) =>
         s.type === currentJob?.laminationType &&
         s.pressName === currentJob?.pressName
     )?.perCoverPriceBdt ?? 0;
-  const invoiceAmount = Math.round(goodOutput * pricePerCover);
+  const coverCost = Math.round(goodOutput * (currentJob?.coverPriceBdt ?? 0));
+  const invoiceAmount = Math.round(goodOutput * pricePerCover) + coverCost;
   const priceNotSet = pricePerCover <= 0;
 
   const handleSaveDraft = async () => {
@@ -108,7 +110,7 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
     try {
       await onVerifyYield(currentJob.id, totalIntake, goodOutput, wasteCount);
       await onGenerateInvoice(currentJob, invoiceAmount);
-      showToast(`Invoice issued: BDT ${invoiceAmount.toLocaleString()} (Good covers x per-cover price).`);
+      showToast(`Invoice issued: BDT ${invoiceAmount.toLocaleString()} (Good covers x per-cover price${coverCost > 0 ? " + cover supply" : ""}).`);
     } catch {
       showToast("Failed to issue the invoice. The backend rejected the yield math — verify and try again.", true);
     } finally {
@@ -147,11 +149,15 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
             }}
             className="w-full text-xs font-bold text-gray-900 bg-gray-50 border border-gray-200 rounded-lg p-2 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
           >
-            {jobs.map((j) => (
-              <option key={j.id} value={j.id}>
-                {j.id}: {j.bookTitle} ({j.publisherName})
-              </option>
-            ))}
+            {jobs.map((j) => {
+              const audited =
+                j.yieldVerified || ["Invoiced", "Completed"].includes(j.status);
+              return (
+                <option key={j.id} value={j.id}>
+                  {audited ? "✓" : "○"} {j.id}: {j.bookTitle} ({j.publisherName})
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>
@@ -353,12 +359,21 @@ export const YieldValidator: React.FC<YieldValidatorProps> = ({
                 <label className="block text-xs font-bold text-gray-700">
                   Invoice Amount (Auto-calculated)
                 </label>
-                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-sm font-mono font-black text-emerald-900 flex items-center justify-between">
-                  <span>
-                    {goodOutput.toLocaleString()} good × BDT {pricePerCover.toLocaleString()} = BDT{" "}
-                    {invoiceAmount.toLocaleString()}
+                <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200 text-sm font-mono font-black text-emerald-900 flex items-center justify-between gap-2">
+                  <span className="leading-tight">
+                    {goodOutput.toLocaleString()} good × BDT {pricePerCover.toLocaleString()}
+                    {coverCost > 0 && (
+                      <>
+                        <br />
+                        <span className="text-xs">
+                          + {goodOutput.toLocaleString()} covers × BDT{" "}
+                          {(currentJob?.coverPriceBdt ?? 0).toLocaleString()} (cover supply)
+                        </span>
+                      </>
+                    )}
+                    <br />= BDT {invoiceAmount.toLocaleString()}
                   </span>
-                  <span className="text-[10px] font-sans text-emerald-700">waste never billed</span>
+                  <span className="text-[10px] font-sans text-emerald-700 shrink-0">waste never billed</span>
                 </div>
                 {priceNotSet && (
                   <p className="text-[11px] text-red-700 bg-red-50 border border-red-200 rounded-lg p-2 font-semibold flex items-start gap-1.5">
