@@ -599,13 +599,18 @@ export default function App() {
   const handleCreateOrder = (newOrd: {
     bookTitle: string;
     coversCount: number;
-    laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
+    laminationType: string;
     dueDate: string;
     pressName: string;
   }) => {
-    const ts = Date.now();
-    const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
-    const id = `#ORD-${ts}-${rand}`;
+    // Sequential human-friendly order id: #ORD-0000001, #ORD-0000002, ...
+    // Derived from the highest existing numeric id so it is deterministic
+    // without a DB write at submit time.
+    const maxSeq = jobs.reduce((max, j) => {
+      const m = j.id.match(/^#ORD-(\d+)$/);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0);
+    const id = `#ORD-${String(maxSeq + 1).padStart(8, "0")}`;
     const sessionPublisherName = currentUser?.businessName || "Unknown Publisher";
     const sessionPressName =
       newOrd.pressName || presses.find((p) => p.toLowerCase() === "nova lamination") || "Nova Lamination";
@@ -631,14 +636,15 @@ export default function App() {
     jobService.createJobOrder(newJob).catch((err) => {
       console.warn("New order backend creation notice:", err.message || err);
     });
-    stockService.deductStock(newOrd.laminationType, newJob.estimatedFilmMeters).catch((err) => {
+    // Deduct meters from the chosen press's own roll stock
+    stockService.deductStock(sessionPressName, newOrd.laminationType, newJob.estimatedFilmMeters).catch((err) => {
       console.warn("Stock deduction backend sync notice:", err.message || err);
     });
 
     // Mirror the deduction locally so the stock meter stays in sync
     setStock((prev) =>
       prev.map((s) =>
-        s.type === newOrd.laminationType
+        s.type === newOrd.laminationType && s.pressName === sessionPressName
           ? { ...s, availableMeters: Math.max(0, s.availableMeters - newJob.estimatedFilmMeters) }
           : s
       )

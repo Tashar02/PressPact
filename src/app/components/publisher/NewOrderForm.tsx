@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { FilmStockItem } from "../../types";
-import { estimateFilmMeters } from "../../lib/calc";
+import { estimateFilmMeters, localTodayIso } from "../../lib/calc";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -9,16 +9,17 @@ import {
   ShieldAlert,
   Send,
   FileText,
+  XCircle,
 } from "lucide-react";
 
-  interface NewOrderFormProps {
+interface NewOrderFormProps {
   stock: FilmStockItem[];
   presses: string[];
   isCreditHold: boolean;
   onCreateOrder: (order: {
     bookTitle: string;
     coversCount: number;
-    laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
+    laminationType: string;
     dueDate: string;
     pressName: string;
   }) => void;
@@ -36,11 +37,9 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
 }) => {
   const [bookTitle, setBookTitle] = useState("");
   const [coversCount, setCoversCount] = useState<number>(2000);
-  const [laminationType, setLaminationType] = useState<
-    "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte"
-  >("Matte 30μm");
+  const [laminationType, setLaminationType] = useState<string>("");
   const [pressName, setPressName] = useState<string>(
-    () => presses.find((p) => p.toLowerCase() === "nova lamination") || presses[0] || "Nova Lamination"
+    () => presses.find((p) => p.toLowerCase() === "nova lamination") || presses[0] || ""
   );
   const [dueDate, setDueDate] = useState(() => {
     const d = new Date();
@@ -48,17 +47,45 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
     return d.toISOString().split("T")[0];
   });
   const [submittedSuccess, setSubmittedSuccess] = useState(false);
+  const [dateError, setDateError] = useState<string | null>(null);
+
+  // Only the selected press's own roll types are offered, and coverage is
+  // checked against that press's inventory (each press manages stock itself).
+  const pressStock = stock.filter((s) => s.pressName === pressName);
+  const finishTypes = Array.from(new Set(pressStock.map((s) => s.type)));
+
+  // Keep the selected finish valid for the chosen press: default to the first
+  // available type, and reset when the press (or its stock) changes.
+  useEffect(() => {
+    if (finishTypes.length === 0) {
+      setLaminationType("");
+    } else if (!finishTypes.includes(laminationType)) {
+      setLaminationType(finishTypes[0]);
+    }
+  }, [pressName, finishTypes.join("|")]);
 
   // Material Coverage Calculation
   const estimatedFilmMeters = estimateFilmMeters(coversCount);
-  const currentStockItem = stock.find((s) => s.type === laminationType);
+  const currentStockItem = pressStock.find((s) => s.type === laminationType);
   const availableMeters = currentStockItem?.availableMeters || 0;
   const isStockInsufficient = estimatedFilmMeters > availableMeters;
+  const hasPressStock = finishTypes.length > 0;
+  const todayIso = localTodayIso();
+  const isPastDate = dueDate < todayIso;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (isCreditHold) {
       onOpenCreditHoldNotice();
+      return;
+    }
+    if (isPastDate) {
+      setDateError("Delivery date cannot be in the past. Please pick a future date.");
+      return;
+    }
+    setDateError(null);
+    if (!laminationType) {
+      setDateError(`${pressName} has not set up film inventory yet. Contact the press to restock.`);
       return;
     }
 
@@ -96,6 +123,13 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
         <div className="p-4 bg-emerald-50 border border-emerald-300 text-emerald-900 rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in">
           <CheckCircle2 className="w-5 h-5 text-[#2e7d46]" />
           Order successfully submitted! The press has been notified to produce test proof.
+        </div>
+      )}
+
+      {dateError && (
+        <div className="p-4 bg-red-50 border border-red-300 text-red-900 rounded-xl font-semibold text-xs flex items-center gap-2 animate-in fade-in">
+          <XCircle className="w-5 h-5 text-red-600" />
+          {dateError}
         </div>
       )}
 
@@ -205,34 +239,37 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                       </option>
                     ))
                   ) : (
-                    <option value="Nova Lamination">Nova Lamination</option>
+                    <option value="">No press registered</option>
                   )}
                 </select>
               </div>
 
-              {/* Lamination Finish Type */}
+              {/* Lamination Finish Type — only the selected press's roll types */}
               <div className="space-y-1">
                 <label className="block text-xs font-bold text-gray-700">
                   Lamination Roll Type / Finish
                 </label>
                 <select
                   value={laminationType}
-                  onChange={(e) =>
-                    setLaminationType(
-                      e.target.value as
-                        | "Matte 30μm"
-                        | "Gloss 24μm"
-                        | "Velvet Touch"
-                        | "Thermal Matte"
-                    )
-                  }
-                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                  onChange={(e) => setLaminationType(e.target.value)}
+                  disabled={!hasPressStock}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46] disabled:bg-gray-100 disabled:text-gray-400"
                 >
-                  <option value="Matte 30μm">Matte 30μm Standard Roll</option>
-                  <option value="Gloss 24μm">Gloss 24μm High-Gloss Roll</option>
-                  <option value="Velvet Touch">Velvet Touch Soft Roll</option>
-                  <option value="Thermal Matte">Thermal Matte Premium Roll</option>
+                  {finishTypes.length > 0 ? (
+                    finishTypes.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="">No roll types configured</option>
+                  )}
                 </select>
+                {!hasPressStock && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2 mt-1">
+                    {pressName || "This press"} has not configured any film roll inventory yet. Contact the press owner to add roll types before ordering.
+                  </p>
+                )}
               </div>
 
               {/* Delivery Target Date */}
@@ -241,10 +278,19 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                 <input
                   type="date"
                   value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900"
+                  min={todayIso}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                    if (e.target.value >= todayIso) setDateError(null);
+                  }}
+                  className={`w-full px-3.5 py-2.5 bg-gray-50 border rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-[#2e7d46] text-gray-900 ${
+                    isPastDate ? "border-red-300 ring-1 ring-red-200" : "border-gray-200"
+                  }`}
                   required
                 />
+                {isPastDate && (
+                  <p className="text-[11px] text-red-700 font-semibold">Delivery date cannot be in the past.</p>
+                )}
               </div>
 
               <button
@@ -273,14 +319,16 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                   </h4>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Calculates estimated film roll requirement against press inventory.
+                  Calculates estimated film roll requirement against {pressName} inventory.
                 </p>
               </div>
 
               <div className="p-4 bg-emerald-50/50 rounded-xl border border-emerald-100 space-y-2 text-xs">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Selected Film Type:</span>
-                  <span className="font-bold text-emerald-950">{laminationType}</span>
+                  <span className="font-bold text-emerald-950">
+                    {laminationType || "—"}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Estimated Film Required:</span>
@@ -297,7 +345,17 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
               </div>
 
               {/* Stock Check Warning Banner (FR-3.3) */}
-              {isStockInsufficient ? (
+              {!hasPressStock ? (
+                <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 space-y-2 animate-in fade-in">
+                  <div className="flex items-center gap-2 font-bold text-red-700">
+                    <AlertTriangle className="w-4 h-4 shrink-0" />
+                    Press Inventory Not Configured!
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-red-800">
+                    {pressName || "This press"} has not added any lamination roll types yet. The press owner must set up their film inventory before orders can be accepted.
+                  </p>
+                </div>
+              ) : isStockInsufficient ? (
                 <div className="p-4 bg-red-50 rounded-xl border border-red-200 text-xs text-red-900 space-y-2 animate-in fade-in">
                   <div className="flex items-center gap-2 font-bold text-red-700">
                     <AlertTriangle className="w-4 h-4 shrink-0" />

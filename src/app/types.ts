@@ -37,7 +37,7 @@ export interface JobOrder {
   pressName: string;
   pressOwnerName?: string;  // e.g. "Md. Abdur Rahim"
   coversCount: number;
-  laminationType: "Matte 30μm" | "Gloss 24μm" | "Velvet Touch" | "Thermal Matte";
+  laminationType: string;
   dueDate: string;
   orderDate: string;
   status: JobStatus;
@@ -60,6 +60,12 @@ export interface JobOrder {
   invoiceDueDate?: string;
   paymentStatus?: "Paid" | "Unpaid" | "Overdue";
   daysOverdue?: number;
+
+  // bKash Payment Submission (two-step payment)
+  bkashTrxId?: string;
+  bkashAmount?: number;
+  paymentSubmittedAt?: string;
+  paymentNote?: string;
 }
 
 export interface FilmStockItem {
@@ -69,6 +75,8 @@ export interface FilmStockItem {
   rollWidthCm: number;
   minThresholdMeters: number;
   lastRestocked: string;
+  pressName?: string;
+  perCoverPriceBdt?: number;
 }
 
 export interface PublisherClient {
