@@ -27,7 +27,10 @@ export const ProofUploadManager: React.FC<ProofUploadManagerProps> = ({
   onSelectJob,
   onUploadProof,
 }) => {
-  const currentJob = selectedJob || jobs[0];
+  // Derive the freshest job by id so the status badge and upload guard reflect
+// parent-side updates instead of a stale selection snapshot.
+  const selectedId = selectedJob?.id || jobs[0]?.id;
+  const currentJob = jobs.find((j) => j.id === selectedId) || selectedJob || jobs[0];
   const [photoUrl, setPhotoUrl] = useState(
     currentJob?.proofPhotoUrl || ""
   );

@@ -26,7 +26,12 @@ export const ProofApprovalGate: React.FC<ProofApprovalGateProps> = ({
   onApproveProof,
   onRejectProof,
 }) => {
-  const currentJob = selectedJob || jobs.find((j) => j.status === "Awaiting Proof") || jobs[0];
+  // Derive the freshest job by id so an approval/rejection written by the parent
+// immediately hides the action buttons instead of leaving a stale snapshot
+// that still shows "Awaiting Proof".
+  const selectedId =
+    selectedJob?.id || jobs.find((j) => j.status === "Awaiting Proof")?.id || jobs[0]?.id;
+  const currentJob = jobs.find((j) => j.id === selectedId) || selectedJob || jobs[0];
 
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectFeedback, setRejectFeedback] = useState("");
