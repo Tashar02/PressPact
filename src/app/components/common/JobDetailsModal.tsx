@@ -1,5 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
+import { formatDateBn } from "../../lib/calc";
 import {
   X,
   BookOpen,
@@ -152,7 +153,7 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
             </div>
             <div className="flex justify-between py-1">
               <span className="text-gray-600">Delivery Due:</span>
-              <span className="font-bold text-amber-700">{job.dueDate}</span>
+              <span className="font-bold text-amber-700">{formatDateBn(job.dueDate)}</span>
             </div>
           </div>
         </div>

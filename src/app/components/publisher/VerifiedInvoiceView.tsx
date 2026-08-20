@@ -1,5 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
+import { formatDateBn } from "../../lib/calc";
 import { Receipt, ShieldCheck, Eye, AlertCircle } from "lucide-react";
 
 interface VerifiedInvoiceViewProps {
@@ -95,7 +96,7 @@ export const VerifiedInvoiceView: React.FC<VerifiedInvoiceViewProps> = ({
                     </td>
 
                     <td className="p-4">
-                      <div className="text-gray-800 font-bold">{job.invoiceDueDate || "—"}</div>
+                      <div className="text-gray-800 font-bold">{formatDateBn(job.invoiceDueDate || "") || "—"}</div>
                     </td>
 
                     <td className="p-4">

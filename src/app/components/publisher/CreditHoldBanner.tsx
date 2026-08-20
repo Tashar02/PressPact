@@ -1,5 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
+import { formatDateBn } from "../../lib/calc";
 import {
   ShieldAlert,
   FileText,
@@ -96,7 +97,7 @@ export const CreditHoldBanner: React.FC<CreditHoldBannerProps> = ({
               </span>
               <div className="flex justify-between py-1 border-b border-red-100">
                 <span className="text-gray-600">Invoice Due Date:</span>
-                <span className="font-bold text-red-700">{overdueJob.invoiceDueDate || "—"}</span>
+                <span className="font-bold text-red-700">{formatDateBn(overdueJob.invoiceDueDate || "") || "—"}</span>
               </div>
               <div className="flex justify-between py-1 border-b border-red-100">
                 <span className="text-gray-600">Days Past Due:</span>

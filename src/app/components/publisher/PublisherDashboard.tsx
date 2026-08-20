@@ -1,5 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
+import { formatDateBn } from "../../lib/calc";
 import {
   FileCheck,
   Clock,
@@ -36,6 +37,25 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
 }) => {
   const pendingProofs = jobs.filter((j) => j.status === "Awaiting Proof");
   const inProdJobs = jobs.filter((j) => j.status === "In Production");
+
+  // Next task hint: tells the publisher exactly what to do next for each order
+  // and jumps straight to the workflow tab it belongs to.
+  const nextTask = (job: JobOrder): { label: string; tab: string } | null => {
+    switch (job.status) {
+      case "Awaiting Proof":
+        return { label: "Review proof now", tab: "proofs" };
+      case "Proof Rejected":
+        return { label: "Review revised proof", tab: "proofs" };
+      case "Invoiced":
+      case "Completed":
+        return { label: "View & pay invoice", tab: "invoices" };
+      case "Order Placed":
+      case "In Production":
+        return null;
+      default:
+        return null;
+    }
+  };
 
   const filteredJobs = jobs.filter((j) => {
     const q = searchQuery.toLowerCase();
@@ -209,7 +229,7 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
                   <td className="p-4">
                     <div className="flex items-center gap-1.5 text-gray-800">
                       <Clock className="w-3.5 h-3.5 text-amber-600" />
-                      <span>{job.dueDate}</span>
+                      <span>{formatDateBn(job.dueDate)}</span>
                     </div>
                   </td>
 
@@ -227,6 +247,17 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
                     >
                       {job.status}
                     </span>
+                    {(() => {
+                      const task = nextTask(job);
+                      return task ? (
+                        <button
+                          onClick={() => onNavigateTab(task.tab)}
+                          className="mt-1.5 flex items-center gap-1 text-[10px] font-bold text-[#2e7d46] bg-green-50 border border-green-200 rounded-lg px-2 py-1 hover:bg-green-100 transition-colors"
+                        >
+                          Next: {task.label} <ChevronRight className="w-3 h-3" />
+                        </button>
+                      ) : null;
+                    })()}
                   </td>
 
                   <td className="p-4 text-right">
