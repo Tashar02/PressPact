@@ -257,7 +257,7 @@ export default function App() {
           return touchesPress || touchesClient;
         }
         const job = jobs.find((j) => j.id === n.jobId);
-        return !job || job.pressName.toLowerCase() === userBusinessName;
+        return !!job && job.pressName.toLowerCase() === userBusinessName;
       });
     }
 
