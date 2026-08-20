@@ -113,6 +113,9 @@ DECLARE
     user_phone TEXT;
     user_location TEXT;
 BEGIN
+    -- Pin the search path so the DEFINER role can never be redirected into a
+    -- hostile schema owned by an attacker.
+    SET search_path = public, pg_temp;
     user_role := COALESCE(NEW.raw_user_meta_data->>'role', 'publisher');
     user_full_name := COALESCE(NEW.raw_user_meta_data->>'fullName', NEW.raw_user_meta_data->>'full_name', 'User');
     user_business_name := COALESCE(NEW.raw_user_meta_data->>'businessName', NEW.raw_user_meta_data->>'business_name', 'Independent Business');
@@ -167,6 +170,7 @@ CREATE INDEX IF NOT EXISTS idx_profiles_role ON profiles(role);
 CREATE OR REPLACE FUNCTION increment_publisher_orders(pub_id TEXT)
 RETURNS VOID AS $$
 BEGIN
+  SET search_path = public, pg_temp;
   UPDATE publishers
   SET total_orders = total_orders + 1
   WHERE id = pub_id;
@@ -180,6 +184,7 @@ RETURNS NUMERIC AS $$
 DECLARE
   v_new_meters NUMERIC;
 BEGIN
+  SET search_path = public, pg_temp;
   UPDATE public.film_stock
   SET available_meters = GREATEST(0, available_meters - p_meters)
   WHERE type = p_type
@@ -235,4 +240,64 @@ DROP TRIGGER IF EXISTS trg_enforce_invoice_math ON job_orders;
 CREATE TRIGGER trg_enforce_invoice_math
   BEFORE UPDATE OF status ON job_orders
   FOR EACH ROW EXECUTE FUNCTION public.enforce_invoice_math();
+
+-- Business rule: a job's lifecycle is strictly forward-moving once it enters
+-- production. Nothing may regress back to proof/order stages after the run
+-- starts, and completed jobs are terminal.
+CREATE OR REPLACE FUNCTION public.enforce_no_status_regression()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_old_rank INT;
+  v_new_rank INT;
+BEGIN
+  v_old_rank := CASE OLD.status
+    WHEN 'Order Placed' THEN 0
+    WHEN 'Awaiting Proof' THEN 1
+    WHEN 'Proof Rejected' THEN 1
+    WHEN 'In Production' THEN 2
+    WHEN 'Yield Audit Pending' THEN 3
+    WHEN 'Invoiced' THEN 4
+    WHEN 'Completed' THEN 5
+    ELSE 0
+  END;
+  v_new_rank := CASE NEW.status
+    WHEN 'Order Placed' THEN 0
+    WHEN 'Awaiting Proof' THEN 1
+    WHEN 'Proof Rejected' THEN 1
+    WHEN 'In Production' THEN 2
+    WHEN 'Yield Audit Pending' THEN 3
+    WHEN 'Invoiced' THEN 4
+    WHEN 'Completed' THEN 5
+    ELSE 0
+  END;
+
+  IF v_new_rank < v_old_rank THEN
+    RAISE EXCEPTION 'Cannot move job from % back to %: lifecycle status only moves forward', OLD.status, NEW.status;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_no_status_regression ON job_orders;
+CREATE TRIGGER trg_enforce_no_status_regression
+  BEFORE UPDATE OF status ON job_orders
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_no_status_regression();
+
+-- Business rule: once a job is invoiced, its audited yield figures become
+-- part of the permanent record and may not be edited.
+CREATE OR REPLACE FUNCTION public.enforce_yield_immutable_after_invoice()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF OLD.status IN ('Invoiced', 'Completed') THEN
+    RAISE EXCEPTION 'Cannot edit yield figures: job is already invoiced';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_yield_immutable_after_invoice ON job_orders;
+CREATE TRIGGER trg_enforce_yield_immutable_after_invoice
+  BEFORE UPDATE OF total_intake, good_output, waste_count, yield_verified ON job_orders
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_yield_immutable_after_invoice();
 

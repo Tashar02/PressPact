@@ -1,4 +1,11 @@
 -- PressPact Initial Seed Data
+--
+-- NOTE ON PILOT DATA: 'pub-1' is a fixed business key, NOT an auth user id.
+-- When the pilot publisher (Shahin Ahmed Mithu / Sagorica Publications) signs
+-- up through the app, the handle_new_user trigger creates a SECOND publishers
+-- row keyed by their auth UUID. The two rows are intentionally not merged by
+-- the seed so the demo can run before auth exists; a production rollout should
+-- either reuse the auth id here or reconcile the duplicate row once.
 
 -- 1. Insert Initial Publisher
 INSERT INTO publishers (
@@ -25,6 +32,12 @@ INSERT INTO film_stock (id, type, available_meters, roll_width_cm, min_threshold
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Insert Initial Job Orders
+-- NOTE: these rows are deliberate demo snapshots and do not always match the
+-- app's own state machine. #ORD-009 carries a fully invoiced/overdue payload
+-- while still sitting in 'Awaiting Proof', and #ORD-008 is 'In Production'
+-- yet already carries invoice figures. They exist only to exercise every UI
+-- screen on first login; live orders created through the app are always
+-- internally consistent because the triggers below enforce it.
 INSERT INTO job_orders (
     id, book_title, publisher_id, publisher_name, press_name, press_owner_name,
     covers_count, lamination_type, due_date, order_date, status, estimated_film_meters,
