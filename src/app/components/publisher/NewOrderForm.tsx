@@ -11,7 +11,6 @@ import {
   FileText,
   XCircle,
   BookMarked,
-  HelpCircle,
 } from "lucide-react";
 
 interface NewOrderFormProps {
@@ -401,32 +400,32 @@ export const NewOrderForm: React.FC<NewOrderFormProps> = ({
                       </>
 ) : (
                        <>
-                         <div className="space-y-2 pt-1">
-                           <div className="space-y-1">
-                             <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
-                               Cover Type Name
-                             </label>
-                             <input
-                               type="text"
-                               value={coverTypeName}
-                               onChange={(e) => setCoverTypeName(e.target.value)}
-                               className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
-                             />
-                           </div>
-                           <div className="space-y-1">
-                             <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
-                               Offered Price (BDT per cover)
-                             </label>
-                             <input
-                               type="number"
-                               value={offeredPriceBdt}
-                               min={0}
-                               step={0.01}
-                               onChange={(e) => setOfferedPriceBdt(Number(e.target.value) || 0)}
-                               className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
-                             />
-                           </div>
-                         </div>
+                        <div className="space-y-2 pt-1">
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                              Cover Type Name
+                            </label>
+                            <input
+                              type="text"
+                              value={coverRequestName}
+                              onChange={(e) => setCoverRequestName(e.target.value)}
+                              className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="block text-[10px] font-bold text-indigo-900 uppercase tracking-wider">
+                              Offered Price (BDT per cover)
+                            </label>
+                            <input
+                              type="number"
+                              value={coverRequestPrice}
+                              min={0}
+                              step={0.01}
+                              onChange={(e) => setCoverRequestPrice(Number(e.target.value) || 0)}
+                              className="w-full p-2.5 bg-white border border-indigo-200 rounded-lg text-xs font-mono font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#2e7d46]"
+                            />
+                          </div>
+                        </div>
                        </>
                      )}
 
