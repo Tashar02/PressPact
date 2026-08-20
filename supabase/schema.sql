@@ -114,8 +114,11 @@ DECLARE
     user_location TEXT;
 BEGIN
     -- Pin the search path so the DEFINER role can never be redirected into a
-    -- hostile schema owned by an attacker.
-    SET search_path = public, pg_temp;
+    -- hostile schema owned by an attacker. `auth` is included because the live
+    -- profiles table's FK to auth.users was created with an unqualified
+    -- reference; without auth in the path, signups fail with
+    -- "relation \"users\" does not exist" during the FK check.
+    SET search_path = public, auth, pg_temp;
     user_role := COALESCE(NEW.raw_user_meta_data->>'role', 'publisher');
     user_full_name := COALESCE(NEW.raw_user_meta_data->>'fullName', NEW.raw_user_meta_data->>'full_name', 'User');
     user_business_name := COALESCE(NEW.raw_user_meta_data->>'businessName', NEW.raw_user_meta_data->>'business_name', 'Independent Business');
