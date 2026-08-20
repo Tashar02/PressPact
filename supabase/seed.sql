@@ -1,11 +1,11 @@
 -- PressPact Initial Seed Data
 --
 -- NOTE ON PILOT DATA: 'pub-1' is a fixed business key, NOT an auth user id.
--- When the pilot publisher (Shahin Ahmed Mithu / Sagorica Publications) signs
--- up through the app, the handle_new_user trigger creates a SECOND publishers
--- row keyed by their auth UUID. The two rows are intentionally not merged by
--- the seed so the demo can run before auth exists; a production rollout should
--- either reuse the auth id here or reconcile the duplicate row once.
+-- When the pilot publisher signs up through the app, the handle_new_user
+-- trigger creates a SECOND publishers row keyed by their auth UUID. The two
+-- rows are intentionally not merged by the seed so the demo can run before
+-- auth exists; a production rollout should either reuse the auth id here or
+-- reconcile the duplicate row once.
 
 -- 1. Insert Initial Publisher
 INSERT INTO publishers (
@@ -13,10 +13,10 @@ INSERT INTO publishers (
 ) VALUES (
     'pub-1',
     'Sagorica Publications',
-    'Shahin Ahmed Mithu',
-    '+880 1711-456789',
-    'orders@sagorikabooks.bd',
-    'Banglabazar, Dhaka',
+    'Dummy Publisher',
+    '+880 1800-000002',
+    'dummy.publisher@example.com',
+    'Motijheel, Dhaka',
     14,
     76500.00,
     33,
@@ -24,49 +24,50 @@ INSERT INTO publishers (
 ) ON CONFLICT (id) DO NOTHING;
 
 -- 2. Insert Initial Film Stock
-INSERT INTO film_stock (id, type, available_meters, roll_width_cm, min_threshold_meters, last_restocked) VALUES
-('stk-1', 'Matte 30μm', 4500.00, 72.00, 1000.00, '2026-07-15'),
-('stk-2', 'Gloss 24μm', 800.00, 72.00, 1500.00, '2026-07-02'),
-('stk-3', 'Velvet Touch', 2200.00, 65.00, 800.00, '2026-07-10'),
-('stk-4', 'Thermal Matte', 3100.00, 70.00, 1000.00, '2026-07-12')
+-- Stock is owned per press; everything below belongs to the demo press
+-- 'Green Print Lamination'. per_cover_price_bdt feeds the auto invoice
+-- amount in the yield validator (good_output x price).
+INSERT INTO film_stock (id, press_name, type, available_meters, roll_width_cm, min_threshold_meters, per_cover_price_bdt, last_restocked) VALUES
+('stk-1', 'Green Print Lamination', 'Matte 30μm', 4500.00, 72.00, 1000.00, 25.00, '2026-07-15'),
+('stk-2', 'Green Print Lamination', 'Gloss 24μm', 800.00, 72.00, 1500.00, 20.00, '2026-07-02'),
+('stk-3', 'Green Print Lamination', 'Velvet Touch', 2200.00, 65.00, 800.00, 32.00, '2026-07-10'),
+('stk-4', 'Green Print Lamination', 'Thermal Matte', 3100.00, 70.00, 1000.00, 28.00, '2026-07-12')
 ON CONFLICT (id) DO NOTHING;
 
 -- 3. Insert Initial Job Orders
--- NOTE: these rows are deliberate demo snapshots and do not always match the
--- app's own state machine. #ORD-009 carries a fully invoiced/overdue payload
--- while still sitting in 'Awaiting Proof', and #ORD-008 is 'In Production'
--- yet already carries invoice figures. They exist only to exercise every UI
--- screen on first login; live orders created through the app are always
--- internally consistent because the triggers below enforce it.
+-- Rows use the app's 8-digit sequential id format (#ORD-00000009) and are
+-- internally consistent with the DB triggers: an invoiced job carries
+-- verified yield figures and a matching invoice amount (good_output x
+-- per-cover price), while a job still in production carries none.
 INSERT INTO job_orders (
     id, book_title, publisher_id, publisher_name, press_name, press_owner_name,
     covers_count, lamination_type, due_date, order_date, status, estimated_film_meters,
     proof_photo_url, proof_note, total_intake, good_output, waste_count, yield_verified,
     invoice_id, amount_bdt, invoice_due_date, payment_status, days_overdue
 ) VALUES (
-    '#ORD-009',
+    '#ORD-00000009',
     'বিদ্যাকোষ-বাংলা ভাষার ব্যাকরণ ও নির্মিতি - অষ্টম শ্রেণি',
     'pub-1',
     'Sagorica Publications',
-    'Nova Lamination',
-    'Md. Abdur Rahim',
+    'Green Print Lamination',
+    'Dummy Press Owner',
     2000,
     'Matte 30μm',
     'Aug 10, 2026',
     'Jul 20, 2026',
-    'Awaiting Proof',
+    'Invoiced',
     1400.00,
     'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10',
     'Applied Matte finish sample run (2 test covers). Please verify edge pasting & color depth.',
     2000, 1950, 50, TRUE,
-    'INV-2026-009', 45000.00, '2026-06-18', 'Overdue', 33
+    'INV-2026-00000009', 48750.00, '2026-06-18', 'Overdue', 33
 ), (
-    '#ORD-008',
+    '#ORD-00000008',
     'A self-learning For Writing Test 1st and 2nd Paper',
     'pub-1',
     'Sagorica Publications',
-    'Nova Lamination',
-    'Md. Abdur Rahim',
+    'Green Print Lamination',
+    'Dummy Press Owner',
     1500,
     'Gloss 24μm',
     'Aug 05, 2026',
@@ -75,18 +76,19 @@ INSERT INTO job_orders (
     1050.00,
     'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10',
     'Gloss 24μm sample approved by publisher.',
-    1500, 1470, 30, TRUE,
-    'INV-2026-008', 31500.00, '2026-08-16', 'Unpaid', 0
+    NULL, NULL, NULL, FALSE,
+    NULL, NULL, NULL, NULL, 0
 ) ON CONFLICT (id) DO NOTHING;
 
 -- 4. Insert Initial Proof Logs
 INSERT INTO proof_logs (job_id, timestamp, action, actor, role, note, photo_url) VALUES
-('#ORD-009', '2026-07-21 14:30:00+06', 'uploaded', 'Md. Abdur Rahim (Nova Lamination)', 'press_owner', 'Uploaded sample proof photo for 2 test covers.', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10'),
-('#ORD-008', '2026-07-16 10:15:00+06', 'uploaded', 'Md. Abdur Rahim', 'press_owner', 'Uploaded Gloss test sample.', NULL),
-('#ORD-008', '2026-07-16 11:45:00+06', 'approved', 'Shahin Ahmed Mithu', 'publisher', 'Approved for full production run.', NULL);
+('#ORD-00000009', '2026-07-21 14:30:00+06', 'uploaded', 'Dummy Press Owner (Green Print Lamination)', 'press_owner', 'Uploaded sample proof photo for 2 test covers.', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTcLiqouJrqFAiLNs5KclUB0rxj6KsoCM8ojeEjqps_Fg&s=10'),
+('#ORD-00000009', '2026-07-22 09:10:00+06', 'approved', 'Dummy Publisher', 'publisher', 'Approved proof; proceed with full Matte run.', NULL),
+('#ORD-00000008', '2026-07-16 10:15:00+06', 'uploaded', 'Dummy Press Owner', 'press_owner', 'Uploaded Gloss test sample.', NULL),
+('#ORD-00000008', '2026-07-16 11:45:00+06', 'approved', 'Dummy Publisher', 'publisher', 'Approved for full production run.', NULL);
 
 -- 5. Insert Initial Notifications
 INSERT INTO notifications (timestamp, title, message, type, unread, job_id) VALUES
-(NOW() - INTERVAL '10 minutes', 'Proof Uploaded', 'Nova Lamination uploaded a test proof.', 'proof', TRUE, '#ORD-009'),
-(NOW() - INTERVAL '1 hour', 'Low Stock Alert', 'Nova Lamination Gloss 24μm film stock (800m) is below minimum threshold (1500m).', 'stock', TRUE, NULL),
+(NOW() - INTERVAL '10 minutes', 'Proof Uploaded', 'Green Print Lamination uploaded a test proof.', 'proof', TRUE, '#ORD-00000009'),
+(NOW() - INTERVAL '1 hour', 'Low Stock Alert', 'Green Print Lamination Gloss 24μm film stock (800m) is below minimum threshold (1500m).', 'stock', TRUE, NULL),
 (NOW() - INTERVAL '1 day', 'Credit Hold Triggered', 'Sagorica Publications account placed on automated credit hold (33 days overdue).', 'credit', FALSE, NULL);
