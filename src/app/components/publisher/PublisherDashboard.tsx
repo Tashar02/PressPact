@@ -8,6 +8,7 @@ import {
   Eye,
   AlertTriangle,
   Search,
+  Receipt,
 } from "lucide-react";
 
 interface PublisherDashboardProps {
@@ -237,6 +238,14 @@ export const PublisherDashboard: React.FC<PublisherDashboardProps> = ({
                         >
                           <FileCheck className="w-3.5 h-3.5" />
                           <span>Review Proof</span>
+                        </button>
+                      ) : job.status === "Invoiced" || job.status === "Completed" ? (
+                        <button
+                          onClick={() => onOpenInvoice(job)}
+                          className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold text-xs transition-colors flex items-center gap-1 shadow-xs"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>View Invoice</span>
                         </button>
                       ) : (
                         <button

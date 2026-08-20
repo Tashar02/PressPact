@@ -2,12 +2,9 @@ import React from "react";
 import { JobOrder } from "../../types";
 import {
   ShieldAlert,
-  AlertTriangle,
   FileText,
   Phone,
   CheckCircle2,
-  XCircle,
-  Building,
 } from "lucide-react";
 
 interface CreditHoldBannerProps {

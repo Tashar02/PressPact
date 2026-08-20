@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   UserRole,
   UserProfile,
@@ -32,7 +32,7 @@ import { JobDetailsModal } from "./components/common/JobDetailsModal";
 import { ContactModal } from "./components/common/ContactModal";
 import { InvoiceModal } from "./components/common/InvoiceModal";
 import { DebugOverlay } from "./components/common/DebugOverlay";
-import { X, Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle, Loader2 } from "lucide-react";
+import { Layers, LayoutDashboard, FileCheck, Calculator, Users, PlusCircle, Receipt, AlertTriangle, Loader2 } from "lucide-react";
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(false);

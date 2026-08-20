@@ -11,8 +11,7 @@ PressPact is a responsive single-page web application designed to digitize order
 ### **Frontend**
 * **Framework:** React 18 (TypeScript) with Vite
 * **Styling:** Tailwind CSS v4
-* **Components & UI:** Radix UI primitives & Lucide React icons
-* **Animations:** Motion (Framer Motion)
+* **Components & UI:** Lucide React icons
 
 ### **Backend & Database**
 * **Database:** Supabase PostgreSQL (Relational schema for orders, stock, audit logs)
@@ -31,13 +30,13 @@ PressPact/
 │   ├── app/
 │   │   ├── components/        # UI components (Press Owner & Publisher views)
 │   │   ├── lib/
-│   │   │   └── supabase.ts    # Supabase client instantiation
+│   │   │   ├── supabase.ts    # Supabase client instantiation
+│   │   │   └── calc.ts        # Shared business math (film estimate, due dates)
 │   │   ├── services/
 │   │   │   ├── authService.ts      # Authentication & user profile backend calls
 │   │   │   ├── jobService.ts       # Job orders & proof audit log backend calls
 │   │   │   ├── stockService.ts     # Film stock inventory backend calls
 │   │   │   └── publisherService.ts # Publisher credit hold & notification backend calls
-│   │   ├── mockData.ts        # Initial master data fallback
 │   │   ├── types.ts           # Core TypeScript interfaces
 │   │   └── App.tsx            # Main application layout & state sync
 │   └── main.tsx               # React application entry point

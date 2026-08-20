@@ -10,7 +10,6 @@ import {
   AlertTriangle,
   Receipt,
   LogOut,
-  Sparkles,
   BookOpen,
   type LucideIcon,
 } from "lucide-react";

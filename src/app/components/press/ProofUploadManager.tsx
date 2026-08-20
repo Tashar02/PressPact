@@ -1,10 +1,9 @@
 import React, { useState, useRef } from "react";
-import { JobOrder, ProofLog } from "../../types";
+import { JobOrder } from "../../types";
 import { jobService } from "../../services/jobService";
 import {
   Upload,
   FileCheck,
-  BookOpen,
   Image as ImageIcon,
   CheckCircle2,
   XCircle,

@@ -3,9 +3,6 @@ import { JobOrder } from "../../types";
 import {
   X,
   BookOpen,
-  Clock,
-  Building,
-  Layers,
   FileCheck,
   Receipt,
   Lock,

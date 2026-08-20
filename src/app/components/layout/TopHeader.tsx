@@ -4,13 +4,11 @@ import {
   Bell,
   Search,
   Menu,
-  X,
   CheckCircle,
   AlertCircle,
   FileText,
   ShieldAlert,
   LogOut,
-  User,
 } from "lucide-react";
 
 interface TopHeaderProps {
@@ -42,7 +40,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   const unreadCount = notifications.filter((n) => n.unread).length;
   const isPress = role === "press_owner";
 
-  const displayName = currentUser?.fullName || (isPress ? "Press Owner" : "Publisher");
   const displayBusiness = currentUser?.businessName || (isPress ? "Press Workspace" : "Publisher Workspace");
 
   return (

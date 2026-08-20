@@ -1,6 +1,6 @@
 import React from "react";
 import { JobOrder } from "../../types";
-import { Receipt, ShieldCheck, CheckCircle2, Eye, AlertCircle } from "lucide-react";
+import { Receipt, ShieldCheck, Eye, AlertCircle } from "lucide-react";
 
 interface VerifiedInvoiceViewProps {
   jobs: JobOrder[];

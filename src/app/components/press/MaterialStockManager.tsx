@@ -2,11 +2,9 @@ import React, { useState } from "react";
 import { FilmStockItem, JobOrder } from "../../types";
 import {
   Layers,
-  Plus,
   AlertTriangle,
   CheckCircle2,
   Package,
-  RotateCcw,
   PlusCircle,
   X,
 } from "lucide-react";

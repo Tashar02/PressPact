@@ -1,12 +1,9 @@
 import React, { useState } from "react";
 import { JobOrder } from "../../types";
 import {
-  FileCheck,
   CheckCircle2,
   XCircle,
-  BookOpen,
   Image as ImageIcon,
-  MessageSquare,
   Clock,
   ShieldCheck,
   X,

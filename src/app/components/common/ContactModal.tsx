@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, MapPin, Mail, Clock, X, Copy, Check } from "lucide-react";
+import { Phone, MapPin, Clock, X, Copy, Check } from "lucide-react";
 
 interface ContactModalProps {
   isOpen: boolean;

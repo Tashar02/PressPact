@@ -47,3 +47,6 @@ Follow these steps to set up the relational database schema and initial seed dat
 3. Name the bucket: `proofs`
 4. Toggle **Public bucket** to `ON` (enables press and publisher to view uploaded sample photos).
 5. Click **Save bucket**.
+6. Because this app runs on the anon key with no Row Level Security, add a storage policy on the `proofs` bucket that lets the `anon` role `INSERT` objects (the app writes directly with `proof.uploadImage(..., 'proofs')`). A read rule for `anon` is already granted by the public-bucket setting.
+
+> **Tip:** Do not enable Row Level Security for the tables in `schema.sql` unless you add matching policies — the client currently relies on anon access for every read and write.
