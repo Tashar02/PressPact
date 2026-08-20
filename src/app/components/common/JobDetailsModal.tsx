@@ -3,15 +3,11 @@ import { JobOrder } from "../../types";
 import {
   X,
   BookOpen,
-  CheckCircle2,
   Clock,
   Building,
-  User,
   Layers,
   FileCheck,
-  AlertTriangle,
   Receipt,
-  FileText,
   Lock,
 } from "lucide-react";
 
@@ -36,7 +32,8 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
     { label: "Order Placed", done: true, active: job.status === "Order Placed" },
     {
       label: "Proof Approval",
-      done: ["Awaiting Proof", "Proof Rejected", "In Production", "Yield Audit Pending", "Invoiced", "Completed"].includes(job.status),
+      // The proof stage is only done once the run has moved past it
+      done: ["In Production", "Yield Audit Pending", "Invoiced", "Completed"].includes(job.status),
       active: job.status === "Awaiting Proof" || job.status === "Proof Rejected",
     },
     {
@@ -56,8 +53,9 @@ export const JobDetailsModal: React.FC<JobDetailsModalProps> = ({
     },
   ];
 
-  // Yield button is available only when job is ready for yield audit
-  const yieldReady = ["Yield Audit Pending", "Invoiced", "Completed"].includes(job.status);
+  // Yield audit is available once production starts; the auditor is where the
+  // press records output figures before issuing the invoice.
+  const yieldReady = ["In Production", "Yield Audit Pending", "Invoiced", "Completed"].includes(job.status);
   // Invoice button available when already invoiced
   const isInvoiced = ["Invoiced", "Completed"].includes(job.status);
 
