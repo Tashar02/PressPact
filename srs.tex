@@ -1,0 +1,886 @@
+\documentclass{scrreprt}
+
+\usepackage[a4paper,top=0.9in,bottom=0.9in,left=1in,right=1in,footskip=0.4in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[english]{babel}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage[table]{xcolor}
+\usepackage{enumitem}
+\usepackage{parskip}
+\usepackage{listings}
+\usepackage{underscore}
+\usepackage{ragged2e}
+\usepackage{xurl}
+\usepackage[bookmarks=true]{hyperref}
+
+\RedeclareSectionCommand[beforeskip=12pt,afterskip=16pt]{chapter}
+
+\hypersetup{
+    bookmarks=true,
+    pdftitle={PressPact: Software Requirements Specification},
+    pdfauthor={Tashfin Shakeer Rhythm},
+    pdfsubject={Software Requirements Specification},
+    pdfkeywords={SRS, PressPact, requirements},
+    colorlinks=true,
+    linkcolor=blue,
+    citecolor=black,
+    filecolor=black,
+    urlcolor=purple,
+    linktoc=page,
+    breaklinks=true
+}
+
+\definecolor{tblhead}{RGB}{217,217,217}
+\newcolumntype{L}[1]{>{\justifying\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+\def\myversion{2.1}
+\date{}
+
+\begin{document}
+
+\begin{flushright}
+    \rule{\textwidth}{5pt}\vskip0.6cm
+    \begin{bfseries}
+        \Huge{SOFTWARE REQUIREMENTS\\ SPECIFICATION}\\
+        \vspace{0.6cm}
+        for\\
+        \vspace{0.6cm}
+        PressPact\\
+        \vspace{0.6cm}
+        \LARGE{Version \myversion}\\
+        \vspace{0.8cm}
+        Prepared by: Tashfin Shakeer Rhythm (2431079)\\
+        \vspace{0.6cm}
+        Course Name \& Code: Web Programming (CSE309A)\\
+        Section: 02\\
+        Semester: Summer 2026\\
+        \vspace{0.6cm}
+        Submitted to: Md. Abu Sayed \\Lecturer-A\\
+        \vspace{0.8cm}
+        22-08-2026\\
+    \end{bfseries}
+\end{flushright}
+
+\tableofcontents
+\clearpage
+
+%============================================================
+% REVISION HISTORY
+%============================================================
+\chapter*{Revision History}
+\addcontentsline{toc}{chapter}{Revision History}
+
+\begin{longtable}{L{0.18\textwidth} L{0.12\textwidth} L{0.60\textwidth} L{0.10\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Name} & \textbf{Date} & \textbf{Reason for Changes} & \textbf{Version} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{Name} & \textbf{Date} & \textbf{Reason for Changes} & \textbf{Version} \\
+\midrule
+\endhead
+Tashfin Shakeer Rhythm & 05-06-2026 & This is the first draft. This was made from questionnaires and interviews with Md. Abdur Rahim, Shahin Ahmed Mithu, and Abu Sayed Chinu. & 1.0 \\
+Tashfin Shakeer Rhythm & 21-08-2026 & The SRS template has been changed. The elicitation notes have been moved into their own chapter. The SRS was updated in accordance with the new backend/frontend choices. Now, React 18, TypeScript, Vite on the frontend, and Supabase for auth, database, and storage. Two new requirements Cover Supply Management and bKash payment submission have been added which are not from the original interviews. & 2.0 \\
+Tashfin Shakeer Rhythm & 22-08-2026 & A shortcoming regarding the performance of the web-application was identified and added to Appendix D. & 2.1 \\
+\bottomrule
+\end{longtable}
+
+%============================================================
+% CHAPTER 1: INTRODUCTION
+%============================================================
+\chapter{Introduction}
+
+\section{Purpose}
+PressPact is a web application for the press-publisher relationship, which to be specific handles book lamination business operation. It covers order tracking, proof approval, yield and waste checks, material coverage, cover sourcing, and billing. Before this, it was all paper and WhatsApp messages between the two sides that leveraged manual business operation.
+
+This SRS shows what the new system actually does and why. All the elicitation methods and how to approach the stakeholder to get information out of them properly are noted down.
+
+\section{Document Conventions}
+Functional, non-functional requirements are labeled FR-n, NFR-category respectively. Each of them also has a MoSCoW tag Must, Should, or Could.
+
+\section{Intended Audience and Reading Suggestions}
+This SRS's direct audience are the people directly involved with PressPact who have input their valuable thoughts and suggestions and their perspective to shape the web-app:
+
+\begin{longtable}{L{0.10\textwidth} L{0.30\textwidth} L{0.60\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Stakeholder} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Stakeholder} & \textbf{Description} \\
+\midrule
+\endhead
+S-1 & Developer (Tashfin Shakeer Rhythm) & Uses Chapters 5 and 6 as the working reference during implementation and testing, and Appendix B to confirm every requirement still traces back to a real stakeholder problem. \\
+S-2 & Press Owner (Md. Abdur Rahim) & Uses Chapter 3 for a plain description of what the system does for the press side of the business. \\
+S-3 & Publisher (Shahin Ahmed Mithu, Abu Sayed Chinu) & Uses Chapter 3 for a plain description of what the system does for the publisher side, particularly billing and credit. \\
+\bottomrule
+\end{longtable}
+
+Readers who are not implementing the system directly can skip the technical detail in Chapters 4 through 6 and read Chapters 1, 2, and 3 for a complete picture of what PressPact does and why it was built this way.
+
+\section{Project Scope}
+PressPact exists to remove four specific sources of financial dispute between a lamination press and its publisher clients: quality approvals that were only ever a WhatsApp message, waste figures that could not be checked, mid-job material shortages, and overdue-payment conversations that strained personal relationships. Two extra requirements were implemented in the project which are, Cover Supply Management and bKash payment submission. They were added during the web-app production midway, after coming to realization that not every publisher supplies their own covers. They depend on the press to supply the covers as well. And most people in the press business get paid through mobile bank services like bKash. Hardly anyone goes through the trouble of bank transfer which is in accordance with the stakeholder's perspective.
+
+PressPact is one web-app but with two workflow views: Press Owner and Publisher. Whatever they do, both are connected through one backend. So when one side does something, for example: approves a proof, asks for payment, the other side sees it as well seamlessly.
+
+This web-app got absolutely nothing to do with money transaction. A publisher pays the press outside PressPact, usually with bKash, and the system just records the bKash transaction ID, and lets the press confirm it from their end. If bKash is not available, then the press owner manually marks the payment as paid after handling it physically with the publisher on his own. Naturally this is also not an accounting system or a print-job scheduler. The only stock this works with is lamination film and covers only and manages the business operation built on it.
+
+\section{References}
+\begin{enumerate}[label={[\arabic*]}]
+\item C. D. Tarantilis, C. T. Kiranoudis, and N. D. Theodorakopoulos, ``A Web-based ERP system for business services and supply chain management: Application to real-world process scheduling,'' European Journal of Operational Research, vol. 187, no. 3, pp. 1310--1326, June 2008, doi: 10.1016/j.ejor.2006.09.015.
+\item Meta Open Source, ``React,'' react.dev, 2025. \url{https://react.dev/} (accessed Aug. 21, 2026).
+\item Supabase, ``Supabase Docs,'' supabase.com, 2025. \url{https://supabase.com/docs} (accessed Aug. 21, 2026).
+\item Overleaf, the Online LaTeX Editor, ``Software Requirements Specification,'' overleaf, 2026. \url{https://www.overleaf.com/latex/templates/software-requirements-specification/ryktphvctsxg}
+\item IEEE, ``IEEE Recommended Practice for Software Requirements Specifications,'' IEEE Std 830-1998, pp. 1--40, Oct. 1998, doi: 10.1109/IEEESTD.1998.88286.
+\end{enumerate}
+
+%============================================================
+% CHAPTER 2: REQUIREMENTS ELICITATION AND ANALYSIS
+%============================================================
+\chapter{Requirements Elicitation and Analysis}
+This chapter covers where the requirements in Chapter 6 actually came from, which are from real conversations with the people who run this business, which has real-world value and practical implication. Chapter 6 shows these conversations directly. But before that, we need to explain the requirements first. Otherwise the audience can get confused when they will come across a stakeholder's line before even knowing who that is.
+
+Three people participated in the elicitation, Md. Abdur Rahim who owns and runs Nova Lamination, Shahin Ahmed Mithu and Abu Sayed Chinu who jointly run Sagorika Publications. Mithu and Chinu are both brothers and publisher clients of Rahim's press. They are not very techy people.
+
+\section{Elicitation Approach}
+Two techniques were used together, with a third used once during the second round of interviews. The first was a short questionnaire, split into a fixed-format section (tick boxes describing how quality, waste, and overdue payments were currently handled) and a free-format section for open questions. The second was a semi-structured interview, held after the questionnaire, where specific real situations the stakeholders had actually been through were used to draw out detail rather than general questions about what features they wanted. During the second interview, printed low-fidelity sketches were also shown to the publisher stakeholders, so that two specific ideas, the yield breakdown and the automatic order block, could be reacted to directly rather than described in the abstract.
+
+A full survey rollout and formal observation sessions were considered and set aside. With three stakeholders, a short questionnaire followed by a direct conversation gave better information for less of their time than a larger exercise would have.
+
+The questionnaire was kept short enough that the fixed-format section could be completed in under a minute, since detailed written answers were unlikely to come back from people doing this as a favor. The free-format questions were kept anyway, mainly as a signal of what would be asked about in person; as expected, they came back blank on both forms and were answered out loud instead during the interviews.
+
+\section{Stakeholder Questionnaires}
+The press-side questionnaire, given to Rahim, asked how quality was currently confirmed before a full run, how wasted covers were tracked, and how publishers who delayed payment beyond 30 days were handled. The fixed-format answers showed a WhatsApp photo exchange for quality confirmation, a mental or paper-based count for waste, and a pattern of repeated phone calls rather than any firmer action on overdue accounts.
+
+The publisher-side questionnaire, given to Mithu and Chinu, asked how the final bill from the press was currently verified, and how transparent the press was about wasted covers. The fixed-format answers showed that the final invoice was generally trusted at face value rather than checked against the physical covers, and that the waste figures on that invoice were seen as ``not transparent at all.''
+
+\section{Press Operations Review}
+This interview was held with Rahim at Nova Lamination on 20-06-2026, to understand the press's current order, quality-check, and billing workflow, and where it broke down.
+
+Rahim described the existing quality process as adequate at first: the press runs a small batch of test covers, sends a photo to the publisher over WhatsApp, and proceeds to the full run once the publisher replies with an acknowledgement, usually a one-word reply or a thumbs-up. Asked whether this had ever caused a problem, he said only that there was ``nothing serious.'' Asked specifically about a recent order for Sagorika Publications, he gave more detail: after a full run of roughly 2,000 covers, the publisher's side claimed the earlier WhatsApp photo had been unclear and that the thumbs-up reply had only meant the photo was received, not that the sample was approved, and asked for a 10 percent discount on that basis. Rahim believed the photo had been clear but had no way to prove it after the fact: ``It's WhatsApp. There's no signature, nothing official. He can say whatever he wants afterward and I have no paper to show him.''
+
+This is exactly why proof approval in PressPact is its own logged action inside the system, instead of being a reply to a chat, which is unreliable for documentation. And once it's logged, nobody has the right to argue later since we have the proof of the agreement in the conversation (FR-1).
+
+About wastes, Rahim said that the covers get counted by hand and written into a register book manually, and ultimately that number is added to the bill. He admitted that publishers question it sometimes, but he got a little bit defensive about it too. He kept repeating that he counts honestly but just can't prove it: ``I just write a number and expect him to trust me. It gets tiring being doubted every time. I'm sick of it.''
+
+Then the idea came up: what if we split Good Output and Waste into two numbers, and check them automatically against a mentioned Total Intake before any invoice is made. His tone changed once he realized the check would apply to him too and not just protect him from suspicion. He then said, ``Then I have nothing to hide from that. That actually protects me more than it protects him.'' That's where the yield and waste validation requirement came from (FR-2).
+
+He was asked what bothered him the most everyday, apart from the labor intensive machine work. Rahim mentioned that he has to chase publishers for the overdue payments. Calling them again and again ate up time, and he made it clear that he'd rather not be the one doing it. That complaint carried straight into the second interview.
+
+\section{Publisher Client Requirements Review}
+Mithu and Chinu sat down for this one at their shop on 27-06-2026. The point was to hear the publisher side of billing and payment, and see how they react to two ideas using low-fidelity design to show early concepts for the web-app.
+
+Neither of them asked for much up front, they just wanted to see their order status and a digitalized billing system clearly. They asked straight out whether they should trust the waste numbers on a press invoice. However, Mithu gave a more honest answer than his questionnaire did. He said, ``most publishers assume presses round waste numbers up, and there's no real way to check without counting a whole batch by hand. You either trust the person or you don't.''
+
+Then a low-fidelity sketch of the yield and waste screen was made with an example, 1,950 good plus 50 waste equals 2,000 total, and a visible pass or fail check. Both liked the idea. Mithu said that a number ``forced to add up automatically'' would carry more weight than anything handwritten. Chinu also agreed. That's where the requirement comes from that a publisher should see the same Good, Waste, and Total breakdown the press sees (FR-2).
+
+Chinu admitted his side sometimes is late for payment over 30 days when book sales are slow when it's not the season for selling new books to schools and colleges, and that the calls from the press about it are awkward but something he's used to and doesn't like it. Then came the idea of blocking new orders automatically once an account hits 30 days overdue. But Chinu pushed back hard. He said it would feel like being ``locked out like a schoolboy'' after twenty years in the business. He argued out of this ego that he'd rather take his next order somewhere.
+
+This was solved with Mithu's opinion on it who agreed to the proposal and since both of them are brothers, they naturally aligned with each other's views. Right now, Rahim has to come with an overdue payment slip himself. An automatic block takes care of that job, since it's a rule the system applies, not something Rahim decided to do to Chinu specifically. Chinu was hesitant but agreed under the condition that the rule had to be fixed and the press should have had no way to override it. This is where the credit hold requirement comes from: it triggers and lifts on its own from the invoice due date, and the press owner has no manual switch either way to bypass it (FR-5).
+
+Mithu wanted a direct link to the unpaid invoice. Chinu wanted a call button to reach the press. Both have been added to the high-fidelity design.
+
+\section{Requirements Identified After the Initial Elicitation}
+Two requirements in this specification did not come out of either interview. Cover Supply Management and the bKash payment submission workflow were both identified during development, once it became clear that not every publisher supplies its own covers, and that most day-to-day payments in this market happen through mobile financial services rather than bank transfer. They are included in Chapter 6 as practical refinements made after the elicitation described above, not as something either stakeholder asked for directly, and are marked as such where they appear.
+
+\section{Challenges Encountered}
+Neither publisher could describe what they wanted in software terms; both defaulted to wanting to see order status and a bill, which meant most of the real requirements had to be drawn out through a specific scenario rather than asked for directly. Rahim got defensive when the waste numbers came since he had past accusations related to wastes that he did not make. So, the conversation had to move carefully from ``is this number right'' to ``how do we make it impossible to argue with.'' Chinu's pushback on the credit hold wasn't planned either, it came up in the middle of the second interview as a real disagreement which got resolved by figuring out what he was actually objecting to, which was not the block itself, but being blocked by Rahim personally. He had an assumption that this would let Rahim abuse the system on him. They were given some free-format sections in the questionnaires but they came back blank since they had no opinion to write down properly. So, the interviews ended up redoing all of that from scratch instead of working off notes already in hand, which was quite the troublesome work honestly.
+
+\section{Requirements Analysis and Prioritization}
+Every requirement gotten from these interviews had to pass the SMART test before it made it into Chapter 6. Let's take an early draft of the yield requirement: ``the system should track waste honestly.'' That fails on all five points of SMART where no action named, no pass or fail line, no point where it applies. What replaced it is the actual requirement in Chapter 6 where invoice generation gets blocked unless Good Output + Waste = Total Intake, checked before the invoice can exist.
+
+MoSCoW properly handled the sorting of the features for the project, regarding what to have vs what not to have. A requirement counts as Must if the dispute behind it would still happen without it, which is why the Proof Gate, the Yield Validator, and the Credit Hold are all Must to have in this project. Should-have requirements improve the system without being the reason it was built; the Material Coverage Calculator sits here, since it prevents a mid-job shortage but was not the source of a stakeholder argument the way the other three were. Could-have requirements, such as manual restocking conveniences, were left for whenever time allowed. Each requirement in Chapter 6 carries this MoSCoW tag, and a short table showing how it meets each SMART criterion.
+
+Finally, each requirement was classified as functional, an action the system performs, or non-functional, a quality the system must have while performing its actions. That split is what Chapters 6 and 7 are built around.
+
+%============================================================
+% CHAPTER 3: OVERALL DESCRIPTION
+%============================================================
+\chapter{Overall Description}
+
+\section{Product Perspective}
+PressPact is a self-contained product with no predecessor system beyond the paper registers, verbal agreements, and WhatsApp messages the press and its publishers used before it. It is built so that more than one press and more than one publisher can use it: film stock, cover types, and pricing are all recorded per press rather than assumed to belong to a single business. The requirements behind this specification, and the deployment the system currently runs, center on one press, Nova Lamination, run by Md. Abdur Rahim, and one publisher, Sagorika Publications, run jointly by Mithu and Chinu, but nothing in the design limits the system to only these two businesses.
+
+\section{Product Functions}
+At a high level, PressPact provides the following functions, each specified in full in Chapter 6:
+\begin{itemize}
+\item Digital Proof Approval Gate: A logged, one-click approval or rejection replaces the WhatsApp photo exchange, with production blocked until it happens.
+\item Yield and Waste Math Validation: Good Output + Waste = Total Intake condition has to be satisfied before generating an invoice. The database checks this itself.
+\item Material Coverage Calculator: Before a new order gets accepted, it's checked against the press's actual film stock.
+\item Cover Supply Management: A publisher has the choice to supply their own covers to the press or buy the cover from the press if they have in stock or ask for a new one at a price the press can accept or turn down.
+\item Automated Payment Job-Blocker (Credit Hold): Once an account passes 30 days overdue, new orders are blocked automatically. There's nothing the press or publisher do about it except the publisher paying the overdue to unblock it.
+\item Payment Submission and Verification: A publisher logs a bKash transaction, or a note for other payment types against an invoice. The press has to confirm it before it counts as paid and mark the payment as paid by themselves afterwards manually.
+\item Role-Based Accounts: Sign-up and sign-in are separate for Press Owner and Publisher. The role picked at login gets checked against the account holder's registration information which is their email address to be specific.
+\item Dashboard and Notifications: Each role sees only its own jobs and in-app notifications for proof check, low stock, credit holds, and cover requests.
+\end{itemize}
+
+\section{User Classes and Characteristics}
+\begin{longtable}{L{0.10\textwidth} L{0.20\textwidth} L{0.45\textwidth} L{0.25\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{User Class} & \textbf{Description} & \textbf{Technical Proficiency} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{User Class} & \textbf{Description} & \textbf{Technical Proficiency} \\
+\midrule
+\endhead
+U-1 & Press Owner & Starts with the lamination work. Logs output, uploads proof photos, keeps film stock and cover types current, sends invoices, confirms payments. & Low. Fine with a smartphone, not with software he doesn't already know. Prefers tapping on intuitive options rather than typing. \\
+U-2 & Publisher & Places orders, approves or rejects proofs, checks credit status, submits payment against invoices. & Low to moderate. Already used to WhatsApp and mobile banking apps. \\
+\bottomrule
+\end{longtable}
+
+Neither group has technical training, they're small-business owners first. That's why the interface tries to be as user friendly and intuitive as possible with short forms, plain labels, and status hints shown through text and icons and by clicking on them, they can instantly move to another page they need to interact with.
+
+\section{Operating Environment}
+\begin{itemize}
+\item Client: Any up-to-date web browser (Recommended- Android: Chrome; iOS/macOS: Safari, Chrome; Windows: Chrome, Edge).
+\item Frontend: React 18 and TypeScript, with Vite and styled with Tailwind CSS.
+\item Backend: Supabase handles the database, authentication, and file storage behind one API. The frontend accesses through the Supabase JavaScript client.
+\item Hosting: Vercel.
+\end{itemize}
+
+\section{Design and Implementation Constraints}
+Only one developer builds the web-app and keeps the project going. This has given some reality checks to shape a few real decisions. Each one came down to what the stakeholders actually needed vs what one person could actually build and maintain all by himself:
+\begin{itemize}
+\item Supabase is only a single backend provider that covers auth, database, and storage. There's no dedicated API server to write and host.
+\item TypeScript is used and the static typing catches mismatched fields and null values during compilation which matters more without a second developer around for code review.
+\item React 18 with Vite made the high-fidelity design possible to turn it into working components directly in that stack without any extra conversion.
+\item Rules that can never be skipped are the proof gate, the yield math check, the job status lifecycle. They all live as PostgreSQL triggers. A bug in the interface can't silently break them without anyone's notice.
+\item No payment gateway. Money transaction is made outside the app. PressPact only records the invoice and its payment and verifies that claim.
+\end{itemize}
+
+\section{User Documentation}
+PressPact doesn't come with a dedicated user manual guide. The interface is self explanatory. There are hints e.g. equation that updates live on the Yield and Waste screen, a navigation menu that stays put and matches whatever role is logged in. On the coding side, the GitHub repository has README which covers the stack information along with setup and deployment guidelines. Proper commit history is also available and a person can trace the source and intention of a change easily using ``git blame''. Code has sufficient comments for documentation.
+
+\section{Assumptions and Dependencies}
+\begin{itemize}
+\item Press owners and publishers are assumed to have access to a smartphone or a computer (most of the time computer isn't used) with internet connection. PressPact has no offline mode.
+\item bKash is assumed to be a good enough payment option here since it's widely used in Bangladesh and even elderly people can use it easily via dialer or bKash's dedicated mobile app. The payment screen still allows adding a note for anyone paying outside bKash.
+\item PressPact depends on Supabase staying online. Auth, data, and file storage all depend on its infrastructure. So, if Supabase ever goes down, PressPact goes down as well. There's no fallback for PressPact here.
+\end{itemize}
+
+%============================================================
+% CHAPTER 4: EXTERNAL INTERFACE REQUIREMENTS
+%============================================================
+\chapter{External Interface Requirements}
+
+\section{User Interfaces}
+The Press Owner gets five sections in the navigation menu: Active Jobs, Proof Approvals, Yield \& Waste
+Math, Film Stock Calculator, Publisher Clients \& Credit. Each section shows a badge when something needs
+attention which can be a pending proof, a low-stock alert, a credit hold. The Publisher's menu covers
+their own side instead in the navigation menu: My Orders, Place New Order, Proof Review Center, Verified Invoices, Credit \& Account Status. Both roles share an view of the invoice, job details, and a way to contact the other side directly.
+Every screen works at PC and mobile dimensions in accordance with the up-to-date display ratios. Most Press Owners check this from a phone
+on the shop floor, not a PC.
+
+\section{Hardware Interfaces}
+A camera is required for taking pictures for proof checking. Camera
+is usually there in regular smartphones, but those who don't have smartphone but PC in their shops will need a dedicated camera.
+
+\section{Software Interfaces}
+\begin{itemize}
+\item Supabase JavaScript client: From auth to file storage, whatever the frontend does goes through this client.
+\item PostgreSQL: This is managed by Supabase itself and holds every job, publisher, stock, cover, log, and profile record entities, and runs the triggers behind specific rules. The rules are stated in Chapter 6.
+\item Supabase Storage: Stores the uploaded proof and payment note photos.
+\item Supabase Auth: Handles account signup, login and sessions. When someone signs up a new account, a database trigger creates their profile automatically with a role-based record.
+\end{itemize}
+
+\section{Communications Interfaces}
+The browser and Supabase communicate over HTTPS through the Supabase client only.
+PressPact imports data from Supabase when someone logs in, and then reimports after any functionality in the app changes it which can be placing an
+order, uploading a proof etc. There's no live connection at the moment for this project. So, if one role changes something, the other role only sees it the next time their screen reloads, not instantaneously on the screen automatically. Appendix D mentions this.
+
+%============================================================
+% CHAPTER 5: DOMAIN MODEL
+%============================================================
+\chapter{Domain Model}
+This chapter lists the entities PressPact is built around, drawn directly from its database schema, and how they relate to one another.
+
+\section{Entities}
+\begin{longtable}{L{0.20\textwidth} L{0.40\textwidth} L{0.40\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Entity} & \textbf{Key Attributes} & \textbf{Description} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{Entity} & \textbf{Key Attributes} & \textbf{Description} \\
+\midrule
+\endhead
+profiles & id (linked to the auth account), role, full name, business name, phone, location & One record per registered user, created automatically at sign-up. \\
+publishers & id, name, contact person, phone, email, location, total orders, outstanding balance, oldest overdue days, credit hold status & A publisher client's business record, including the running totals the Credit Hold requirement depends on. \\
+job_orders & id, book title, publisher, press, covers count, lamination type, status, proof and yield fields, invoice and payment fields, cover-supply fields & The central record of the system: one order moving through proof, production, yield audit, invoicing, and payment. \\
+proof_logs & id, job, timestamp, action (uploaded, approved, rejected), actor, role, note, photo & An append-only record of every proof-related action taken on a job, forming the audit trail behind the Proof Approval Gate. \\
+business_logs & id, job, timestamp, actor, role, action, note & A general-purpose, append-only ledger of notable actions on a job beyond proof events, such as order placement and invoicing. \\
+film_stock & id, press, film type, available meters, roll width, minimum threshold, per-cover price & One press's inventory of a given lamination film type, used by the Material Coverage Calculator. \\
+cover_types & id, press, name, price, description & A cover stock option a press is willing to sell to publishers who choose not to supply their own covers. \\
+notifications & id, timestamp, title, message, type, read state, related job & An in-app alert generated by a business event (proof, yield, credit, stock, order, or cover). \\
+\bottomrule
+\end{longtable}
+
+\section{Relationships}
+\begin{itemize}
+\item One Publisher places many Job Orders; each Job Order belongs to exactly one Publisher.
+\item One Job Order accumulates many Proof Log entries and many Business Log entries, forming its full history.
+\item One Press (identified by name) owns many Film Stock records and many Cover Type records; a Job Order draws its film estimate from its press's Film Stock, and its cover cost, if applicable, from that press's Cover Type.
+\item Each profile is exactly for one authenticated user. Signing up an account while picking either Publisher or Press Owner specifically builds record in the database for that.
+\item A notification can point back to the job order that caused it, but doesn't have to. e.g A low stock alert isn't tied to any one job.
+\end{itemize}
+
+%============================================================
+% CHAPTER 6: SYSTEM FEATURES
+%============================================================
+\chapter{System Features}
+Every feature below follows the following format:
+\begin{enumerate}
+\item A short description of the feature to understand its functionality.
+\item What the specific feature starts.
+\item What has to be true before the specific feature starts.
+\item The basic flow of the feature step by step.
+\item Any alternate flow the feature can take.
+\item The business rules that drive the feature and the relations of the rules with MoSCoW and SMART.
+\item What the state the system is left with after the execution of the feature.
+\end{enumerate}
+
+%---------------- 6.1 ----------------
+\section{Digital Proof Approval Gate}
+\textbf{Brief Description:} Replaces the process where people share pictures using WhatsApp and confirming whether they like the end result with a logged and one-click approval the system actually enforces. This is so that nobody can deny something after the production has started because the proof is permanently logged that they gave their consent.
+
+\textbf{Business Trigger:} The Press Owner has produced a small sample run and is ready for the Publisher to confirm quality before committing the full batch.
+
+\textbf{Preconditions:} The job exists and is in the ``Order Placed,'' ``Awaiting Proof,'' or ``Proof Rejected'' status.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & Press Owner uploads one or more proof photos and an optional note. & System stores the photos, sets the job status to ``Awaiting Proof,'' logs the upload, and notifies the Publisher. \\
+2 & Publisher opens the Proof Review Center and views the photos and note. & System displays the current proof alongside the option to approve or reject. \\
+3 & Publisher taps Approve. & System logs the approval, and only then allows the job status to move to ``In Production.'' \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Proof Rejected:} If at step 3 the Publisher instead rejects the proof, with an optional note explaining why, the system logs the rejection, sets the job status to ``Proof Rejected,'' and returns control to step 1: the Press Owner must upload a revised proof before the job can move forward again.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-1.1 & The system shall allow a Press Owner to upload one or more proof photos and an optional note for a job before production begins. & Must \\
+FR-1.2 & The system shall block a job from reaching ``In Production'' unless a Publisher approval is on record, enforced in the database, not only in the interface. & Must \\
+FR-1.3 & The system shall permanently log every proof upload, approval, and rejection with a timestamp and the acting user. & Must \\
+FR-1.4 & The system shall let a Publisher send feedback by leaving a short note when rejecting a proof so that the Press Owner knows what to fix or improve. & Should \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & The approval or rejection of a proof happens inside the system which is properly logged. This is not a reply to a chat which can be erased. \\
+Measurable & A job got approval or it didn't get. \\
+Achievable & Built as a status field with a log table where the logs can be added. The existing SQL schema can handle this. \\
+Relevant & Answers the WhatsApp dispute Rahim talked about. \\
+Time-bound & Kicks in at a specific time before a job can move to production. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} The job's status always shows exactly where things stand. Either a person is waiting for proof, waiting for approval, rejected, or cleared and got consent to start production. The entire proof history stays logged if anyone needs to check it later on.
+
+%---------------- 6.2 ----------------
+\section{Yield and Waste Math Validation}
+\textbf{Brief Description:} Makes sure that a job's addition of Good Output and Waste actually match its Total Intake before an invoice is generated. This means the waste number does not come someone's words but rather as an arithmetic operation in the system the Press Owner inputs.
+
+\textbf{Business Trigger:} Production is done and the Press Owner is ready to send the bill to the Publisher for his payment.
+
+\textbf{Preconditions:} Production is done and not invoiced yet.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & Press Owner enters Total Intake, Good Output, and Waste for the job. & System adds Good Output and Waste and checks the sum of them against the Total Intake and thereby shows wither ``Matched'' or ``Mismatched''. \\
+2 & Press Owner requests the invoice once the figures match. & System generates the invoice amount by multiplying per-cover price with the Good Output, and adds any cover cost the press supplied. Then it generates the final invoice. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Figures Do Not Match:} If Good Output + Waste doesn't equal Total Intake at step 1, the Generate Invoice button is greyed out and cannot be clicked. At the same time, the screen shows which figure is wrong in the math. The database also runs this same check to ensure the invoice's amount isn't messed with or bypassed in any way.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-2.1 & The system shall require Total Intake, Good Output, and Waste separately before an order can be invoiced. & Must \\
+FR-2.2 & The system shall block invoice creation unless Good Output + Waste = Total Intake is satisfied which is checked by a trigger in the database. & Must \\
+FR-2.3 & The system shall exactly show both the Publisher and Press Owner the same Good, Waste, and Total Intake breakdown. & Must \\
+FR-2.4 & Once a job is invoiced, the system shall block any kinds of edits to the yield figures and finalize them. & Should \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Needs three numbers and one arithmetic operation with an equality check. \\
+Measurable & Pass or fail is judged through only Good Output + Waste = Total Intake. \\
+Achievable & Built as a database constraint that runs the moment an invoice gets made. \\
+Relevant & Answers Mithu's and Chinu's distrust of press given report on waste numbers. There's no way to fake data here. \\
+Time-bound & Applies at a specific time right before an invoice can be generated. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} The job carries a verified, immutable yield record and an invoice whose amount is derived directly from that record.
+
+%---------------- 6.3 ----------------
+\section{Material Coverage Calculator}
+\textbf{Brief Description:} Checks a new order's estimated film requirement against the chosen press's actual film stock before the order is accepted, so a job is not started only to run out of material partway through.
+
+\textbf{Business Trigger:} A Publisher is filling out a new order and has chosen a press and a lamination finish.
+
+\textbf{Preconditions:} The chosen press has at least one film type configured in its stock.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & Publisher selects a press, a lamination finish, and a covers count. & System estimates the film meters the job will need and compares it against that press's available stock for the chosen finish. \\
+2 & Publisher submits the order, with the estimate within available stock. & System accepts the order and, once production starts, deducts the used film from that press's stock. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Stock Insufficient or Not Configured:} If the estimated requirement exceeds available stock, or the chosen press has not configured any film stock, the system blocks submission and tells the Publisher to contact the press to restock or choose a different finish.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-3.1 & The system shall let each Press Owner record and update their own film stock, by type, in meters. & Should \\
+FR-3.2 & The system shall estimate film requirement from a new order's covers count and compare it against the chosen press's stock before the order is accepted. & Should \\
+FR-3.3 & The system shall deduct film meters from stock atomically when a job consumes them, so concurrent orders cannot both succeed against material that only exists once. & Should \\
+FR-3.4 & The system shall notify the Press Owner when a film type falls below its configured minimum threshold. & Could \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Compares one number, estimated film requirement, against one other, available stock. \\
+Measurable & Pass or fail is a direct greater-than or less-than comparison. \\
+Achievable & Built as a stock table with an atomic deduction on job start. \\
+Relevant & Prevents a mid-job material shortage rather than reacting to one after the fact. \\
+Time-bound & Applies before an order is accepted, not after. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} No order is accepted against a press that cannot currently supply the film it needs, and stock levels stay accurate as jobs consume material.
+
+%---------------- 6.4 ----------------
+\section{Cover Supply Management}
+\textbf{Brief Description:} Lets a Publisher supply their own printed covers for lamination, buy a cover type the press already stocks, or ask the press to source a new cover type at a price the Publisher proposes. This requirement was identified after the interviews described in Chapter 2, once it became clear not every publisher supplies its own covers.
+
+\textbf{Business Trigger:} A Publisher placing a new order does not want to, or cannot, supply their own printed covers.
+
+\textbf{Preconditions:} The Publisher is on the New Order screen for a chosen press.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & Publisher chooses press-purchased covers and selects an existing cover type the press offers. & System attaches that cover type and its price to the order. \\
+2 & Press Owner reviews and fulfils the order as usual. & System includes the cover cost in the eventual invoice amount alongside the lamination charge. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: No Matching Cover Type Available:} If the chosen press has not configured any cover types, the system switches the Publisher into a cover request mode: they describe the cover they need and the price they are willing to pay, and submit the order with that request attached, marked ``requested'' rather than approved. The Press Owner then reviews pending cover requests and either approves the request, fixing that price and type to the order, or rejects it, which requires the Publisher to choose a different approach before the order can proceed.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-4.1 & The system shall let a Publisher mark an order as client-supplied covers or press-purchased covers. & Must \\
+FR-4.2 & The system shall let a Press Owner maintain a list of cover types with a name, price, and description that Publishers can choose from. & Should \\
+FR-4.3 & If a press has no configured cover types, the system shall let a Publisher request a specific cover type and proposed price as part of placing an order. & Should \\
+FR-4.4 & The system shall let a Press Owner approve or reject a pending cover request, and shall keep the order's cover status accurate to that decision. & Should \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Names three concrete cover-supply paths: client-supplied, press-catalog, and requested. \\
+Measurable & Every order ends with exactly one of those three states recorded. \\
+Achievable & Built as a status field plus a request-and-approve flow reusing the existing order schema. \\
+Relevant & Closes a gap found once real orders showed not every publisher supplies covers. \\
+Time-bound & Resolved before an order can be fulfilled. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} Every order has an unambiguous cover-supply arrangement, and any press-purchased cover cost is correctly reflected in the final invoice.
+
+%---------------- 6.5 ----------------
+\section{Automated Payment Job-Blocker (Credit Hold)}
+\textbf{Brief Description:} Automatically disables new-order placement for a Publisher account once any invoice is more than 30 days overdue, with no manual override available to the Press Owner, so neither side has to have an uncomfortable personal conversation about it.
+
+\textbf{Business Trigger:} An invoice's due date passes 30 days without being marked paid.
+
+\textbf{Preconditions:} The Publisher already has at least one invoice that's unpaid or past the allowed due date.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & System checks every Publisher's invoices against today's date each time data loads. & If a Publisher has an unpaid invoice more than 30 days, the system switches their credit hold status from ``inactive'' to ``active'' and records how many days the oldest one has been left due. \\
+2 & Publisher attempts to place a new order while on hold. & System stops the action and shows the Credit Hold screen with a warning showcasing the overdue money amount, the source of the order, the unpaid invoice, a button to call the press immediately. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Invoice Paid:} Once the Press Owner confirms that the overdue amount has been paid, the system rechecks the Publisher's hold status next time the data loads, and lifts the block on placing new orders if nothing is overdue. But if the total amount is still not paid, credit hold is still active and the publisher has no way to remove it.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-5.1 & The system shall calculate the number of days an invoice is overdue based on its starting due date. & Must \\
+FR-5.2 & The system shall put a Publisher on credit hold automatically if due amount isn't paid within 30 days, and lift it once everything is paid. & Must \\
+FR-5.3 & The system shall give no role to impose or lift a credit hold outside the system on their own to impose fair rule. & Must \\
+FR-5.4 & The system shall let a Publisher see the unpaid invoice and get in touch with the Poress Owner directly to pay the money and get it solved. & Should \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & One condition triggers this which is that if any invoice is more than 30 days overdue. \\
+Measurable & Hold status works as a boolean which is gotten from invoice's due date. \\
+Achievable & Built as a status the system works auto calculates and imposes which requires no additional approval from any of the roles. \\
+Relevant & Directly answers Chinu's objection to being blocked personally by Rahim; the block had to be the system's rule, not a person's decision. \\
+Time-bound & Recalculated on every data load, so it reflects the current overdue state at all times. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} A Publisher's ability to order tracks their actual payment status at all times, without either side needing to raise it personally. The 30-day threshold is currently fixed system-wide; making it configurable per press or per publisher is recorded as a to be determined item in Appendix D.
+
+%---------------- 6.6 ----------------
+\section{Payment Submission and Verification}
+\textbf{Brief Description:} Lets a Publisher record that they have paid an invoice, most commonly through a bKash transaction made outside the app, and requires the Press Owner to confirm it before the invoice counts as paid. This requirement was also identified during development rather than in the original elicitation, once it was clear that bKash, not bank transfer, is how most of these invoices actually get settled.
+
+\textbf{Business Trigger:} A Publisher has paid an invoice and wants that reflected in the system.
+
+\textbf{Preconditions:} The invoice exists and is not already marked paid.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & Publisher sends the invoice amount to the press's bKash number outside the app, then submits the transaction ID and amount in the invoice view. & System stores the submission against the invoice and notifies the Press Owner. \\
+2 & Press Owner checks their bKash account's transaction history or the SMS sent by bKash for the matching transaction ID and confirms the payment. & System marks the invoice ``paid.'' This also lifts the credit hold if this was their only overdue invoice. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Payment Made without bKash:} The Press Owner has to manually mark the invoice paid. If a transaction gets submitted, the Press Owner still reviews it. It doesn't get marked ``paid'' out of trust here.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-6.1 & The system shall let a Publisher submit a bKash transaction ID and money amount with an optional note or screenshot of the bKash transaction. & Should \\
+FR-6.2 & The system shall require the Press Owner to confirm a submitted payment himself manually before the invoice is marked ``paid''. & Should \\
+FR-6.3 & The system shall let a Press Owner mark an invoice ``paid'' manually for transaction made outside bKash. & Could \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Requires a set of fields: transaction ID and amount, and a clear and proper confirmation. \\
+Measurable & An invoice is either confirmed ``paid'' or otherwise it isn't. \\
+Achievable & Built as a submission record and a single confirmation step. \\
+Relevant & Matches how transactions are made in this business. \\
+Time-bound & Confirmation happens before the status on the invoice changes. If there was credit hold, then the overdue amount is also recalculated before. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} An invoice only counts as paid once the Press Owner confirms it.
+
+%---------------- 6.7 ----------------
+\section{Account Registration and Role-Based Access}
+\textbf{Brief Description:} Lets someone new sign up as a Press Owner or a Publisher and keeps the role chosen at login
+locked to whatever role the account was actually created under using their email address.
+
+\textbf{Business Trigger:} A new business wants to start using PressPact, or an existing user is signing back in.
+
+\textbf{Preconditions:} None, for sign-up; an existing account, for sign-in.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & New user selects Press Owner or Publisher, and enters full name, business name, phone, shop location, email, and password. & System creates the account, and a database trigger automatically creates the matching profile and, for a publisher, the matching publisher record. \\
+2 & Returning user selects a role and enters email and password. & System checks the role selected against the role stored on the account before creating a session, and routes the user to the dashboard for their actual role. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Alternate Flow AF1: Role Mismatch at Login:} If the role selected at login does not match the role stored on the account, the system rejects the sign-in attempt and asks the user to select the correct role, rather than silently logging them in under the wrong one.
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-7.1 & The system shall require role selection at both sign-up and sign-in. & Must \\
+FR-7.2 & The system shall reject a sign-in where the selected role does not match the account's stored role. & Must \\
+FR-7.3 & The system shall show each user only the screens and data relevant to their own role, and for a Publisher, only their own orders. & Must \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Role check is a single field comparison at sign-in. \\
+Measurable & Sign-in is either successful by the correct role or gets rejected. \\
+Achievable & Checked directly against the user metadata the Supabase Auth stores. \\
+Relevant & Does not constitute a situation where one might end up in another's dashboard. \\
+Time-bound & Verified during every single sign-in operation. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} Every session is opened after verifying one's role. There's no chance that somoebody else will see dashboard of another role, ensuring proper security and privacy.
+
+%---------------- 6.8 ----------------
+\section{Dashboard and Notifications}
+\textbf{Brief Description:} Provides each role a home screen that showcases their own active jobs, and sends notification the app whenever a task needs attention.
+
+\textbf{Business Trigger:} A user logs in, or a business event happens that the other party should know about.
+
+\textbf{Preconditions:} The user is logged in.
+
+\textbf{Basic Flow}
+\begin{longtable}{p{0.05\textwidth} L{0.43\textwidth} L{0.52\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{\#} & \textbf{Action} & \textbf{System Response} \\
+\midrule
+\endhead
+1 & User logs in. & System loads that user's jobs (all jobs for a Press Owner, only their own for a Publisher) and shows them with book title, counterparty, due date, and current status. \\
+2 & A business event occurs (proof uploaded, yield issue, credit hold, low stock, cover request). & System creates a notification of the matching type and shows it as unread until the user opens it. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Business Rules}
+\begin{longtable}{p{0.12\textwidth} L{0.76\textwidth} p{0.12\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+FR-8.1 & The system shall show a Press Owner every job across their business, and a Publisher only their own jobs. & Must \\
+FR-8.2 & The system shall generate a notification for proof, yield, credit, stock, order, and cover events, and let a user mark notifications as read. & Should \\
+\bottomrule
+\end{longtable}
+
+\textbf{SMART Justification}
+\begin{longtable}{p{0.18\textwidth} L{0.82\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Criterion} & \textbf{How It Is Met} \\
+\midrule
+\endhead
+Specific & Names six concrete notification-triggering event types. \\
+Measurable & A notification either exists for a given event or it does not, and is either read or unread. \\
+Achievable & Built as a single notification table keyed to the triggering event type. \\
+Relevant & Answers both groups' request for a simple way to see order status without hunting for it. \\
+Time-bound & Generated at the moment the triggering event occurs. \\
+\bottomrule
+\end{longtable}
+
+\textbf{Post-Condition:} Both roles can see, at a glance, what is active and what needs a decision from them.
+
+%============================================================
+% CHAPTER 7: OTHER NONFUNCTIONAL REQUIREMENTS
+%============================================================
+\chapter{Other Nonfunctional Requirements}
+
+\section{Performance Requirements}
+\begin{longtable}{L{0.18\textwidth} L{0.68\textwidth} p{0.14\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+NFR-PERF.1 & The dashboard shall load a user's jobs within 1 second or less than it. Data shall not be load from browser side due to latency from the user's device and browser computation capability. & Should \\
+NFR-PERF.2 & The Yield and Waste match check shall recalculate on screen within 1 second of a field changing. & Must \\
+\bottomrule
+\end{longtable}
+
+\section{Safety Requirements}
+There is no physical safety concern here; the closest equivalent is financial safety. The system must never let money change hands, in the form of an invoice, against unverified figures. This is not left to interface design alone: the invoice-math check (FR-2.2) and the proof-approval gate (FR-1.2) are both enforced by PostgreSQL triggers, so they hold even if a bug in the interface tried to skip them.
+
+\section{Security Requirements}
+\begin{longtable}{L{0.18\textwidth} L{0.68\textwidth} p{0.14\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{ID} & \textbf{Requirement} & \textbf{MoSCoW} \\
+\midrule
+\endhead
+NFR-SEC.1 & The system shall never store or log a password in plaintext; Supabase Auth's built-in hashing is relied on for this. & Must \\
+NFR-SEC.2 & The system shall restrict a Publisher to viewing only their own orders and invoices. & Must \\
+NFR-SEC.3 & The system shall restrict proof approval and rejection on an order to the Publisher account that order belongs to. & Must \\
+\bottomrule
+\end{longtable}
+
+\textbf{Known limitation:} Data isolation between publishers is currently enforced at the application query layer, each request filtered by the logged-in user's identity, rather than by PostgreSQL row-level security policies at the database layer. This is recorded as an open item in Appendix C rather than presented as already solved.
+
+\section{Software Quality Attributes}
+\begin{itemize}
+\item \textbf{Reliability:} Database triggers enforce the proof gate, the yield math check, and the
+  job status lifecycle. The rules are absolute.
+\item \textbf{Maintainability:} The frontend is designed as one file per data domain where jobs,
+  stock, publishers, auth, covers each are in a dedicated file. Changing one
+  area doesn't mean touching the rest which makes the maintainability easier.
+\item \textbf{Portability:} There's no native code behind PressPact. Only the browser handles it and this makes it possible for almost all modern browsers to run the app without any hassle or a separate build for each OS.
+\item \textbf{Usability:} The web-app interface is user-friendly enough for anyone to use it without any fuss. Neither stakeholder needs a dedicated user manual for this.
+\end{itemize}
+
+%============================================================
+% CHAPTER 8: OTHER REQUIREMENTS
+%============================================================
+\chapter{Other Requirements}
+
+\section{Monitoring Strategy}
+Monitoring on PressPact is currently light since the target stakeholder and its business operation management is not that big. The in-app notifications serves as the monitor here. Low stock, credit holds, proof events, cover requests show up
+as a notification the moment it happens. So, nobody has to check a separate dashboard for it everytime. There was a debug overlay added during development phase to catch bugs quickly, but this is not part of the deployed app in production. So, this doesn't do any monitoring.
+
+\section{Risk Management}
+\begin{longtable}{R{0.20\textwidth} L{0.40\textwidth} L{0.40\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Risk} & \textbf{Description} & \textbf{Mitigation} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{Risk} & \textbf{Description} & \textbf{Mitigation} \\
+\midrule
+\endhead
+Vendor dependency & Authentication, the database, and file storage all run through Supabase; an outage there is a full outage for PressPact. & Acceptable for now, given the current scale of the project. A future version could add caching of data for read-only views. \\
+Single developer & The system is built and maintained by one person, with no code review from a second developer. & TypeScript's static typing catches many errors during compile-time which is handy for a solo project like this, but gettin help by code reviews from others is much appreciated here. \\
+No automated tests & The project currently has no automated test suite; correctness relies on manual testing and the database-level business rule triggers. & The rules that matter most which are the proof gate, the yield math check, the status lifecycle, all of them run at the database level for exactly this reason. They can't quietly break, even without test coverage behind them. Supabase thankfully handles this for us. \\
+Data isolation gap & Publisher data isolation is enforced by the application, not by database row-level security (see Section 7.3). & Logged as an open item in Appendix C for revisit in future. \\
+\bottomrule
+\end{longtable}
+
+\section{Change Management Process}
+Every change is committed on the project's GitHub repository with proper commit history. The commit message follows a format of ``core dir or filename path: Capitalized message with conciseness''. This is inspired from Linux kernel's commit writing style which I personally prefer and it is very straightforward to understand.
+Every change is made in 1 branch (main) for such a small project. But as of now, this is still a solo project, so if multiple people were to join the project, this would need proper code reviewing system and PR (Pull Reqeust) management on GitHub before anything is merged and multiple branches can be introduced then.
+
+%============================================================
+% APPENDICES
+%============================================================
+\chapter*{Appendix A: Glossary}
+\addcontentsline{toc}{chapter}{Appendix A: Glossary}
+\begin{longtable}{L{0.22\textwidth} L{0.78\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Term} & \textbf{Definition} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{Term} & \textbf{Definition} \\
+\midrule
+\endhead
+Proof & A small sample run of laminated covers produced before the full print run, used to confirm quality. \\
+Yield & The number of successfully laminated (good) covers produced from a given input quantity. \\
+Waste & The number of covers ruined or spoiled during lamination. \\
+Credit Hold & An automatic restriction that blocks a Publisher from placing new orders while an invoice is more than 30 days overdue. \\
+Cover Supply & Whether a job's printed covers are supplied by the Publisher or purchased through the Press. \\
+bKash & A mobile financial service widely used in Bangladesh for person-to-person and merchant payments. \\
+MoSCoW & A prioritization method classifying requirements as Must, Should, Could, or Won't have. \\
+SMART & A requirements-quality check: Specific, Measurable, Achievable, Relevant, Time-oriented. \\
+\bottomrule
+\end{longtable}
+
+\chapter*{Appendix B: Requirements Traceability Matrix}
+\addcontentsline{toc}{chapter}{Appendix B: Requirements Traceability Matrix}
+This matrix links each functional requirement back to the stakeholder statement or development-phase gap that produced it, and forward to how it is verified.
+\begin{longtable}{L{0.20\textwidth} L{0.45\textwidth} L{0.35\textwidth}}
+\toprule
+\rowcolor{tblhead} \textbf{Requirement} & \textbf{Origin} & \textbf{Verification} \\
+\midrule
+\endfirsthead
+\toprule
+\rowcolor{tblhead} \textbf{Requirement} & \textbf{Origin} & \textbf{Verification} \\
+\midrule
+\endhead
+FR-1.1 to FR-1.4 & Rahim, Press Operations Review: a WhatsApp thumbs-up was later denied as approval. & Manual test: a job cannot reach ``In Production'' without a logged approval. \\
+FR-2.1 to FR-2.4 & Mithu and Chinu, Publisher Client Requirements Review: waste figures could not be checked and were assumed inflated. & Manual test plus database trigger: invoicing fails if Good plus Waste does not equal Total Intake. \\
+FR-3.1 to FR-3.4 & Original project scope, not tied to a specific stakeholder statement. & Manual test: an order is blocked when estimated film exceeds available stock. \\
+FR-4.1 to FR-4.4 & Development-phase gap, identified after the initial elicitation: not every publisher supplies its own covers. & Manual test: an order with press-purchased covers and no configured type triggers the request-and-approve path. \\
+FR-5.1 to FR-5.4 & Chinu, Publisher Client Requirements Review: objected to being blocked personally by Rahim; accepted once the block was made automatic with no manual override. & Manual test: no interface control exists for a Press Owner to impose or lift a hold directly. \\
+FR-6.1 to FR-6.3 & Development-phase gap: bKash is the dominant payment method among these stakeholders. & Manual test: an invoice does not become ``Paid'' from a submission alone, only after Press Owner confirmation. \\
+FR-7.1 to FR-7.3 & Both stakeholder groups, questionnaires: confirmed press and publisher have different daily tasks and should not see each other's screens. & Manual test: signing in with the wrong role for an existing account is rejected. \\
+FR-8.1 to FR-8.2 & Both stakeholder groups: asked for a simple way to see order status without hunting for it. & Manual test: each role's dashboard shows only the jobs that belong to them. \\
+\bottomrule
+\end{longtable}
+
+\chapter*{Appendix C: Issues List}
+\addcontentsline{toc}{chapter}{Appendix C: Issues List}
+\begin{itemize}
+\item \textbf{C-1 (Resolved):} An earlier version of this specification had no screen behind the Material Coverage Calculator. It is now fully implemented (Section 6.3, Film Stock Calculator screen).
+\item \textbf{C-2 (Open):} Publisher data isolation currently relies on application-level query filtering rather than PostgreSQL row-level security policies (see Section 7.3 and Appendix C).
+\item \textbf{C-3 (Resolved):} Whether the Credit Hold should be a press decision or a system rule was an open disagreement with Chinu during the Publisher Client Requirements Review; resolved by removing any manual override from the Press Owner entirely (FR-5.3).
+\end{itemize}
+
+\chapter*{Appendix D: To Be Determined List}
+\addcontentsline{toc}{chapter}{Appendix D: To Be Determined List}
+\begin{itemize}
+\item Should the 30-day credit hold threshold in FR-5.2 be made configurable?
+\item Should the backend migrate to a custom Node.js service with manual control over database, storage and authentication?
+\item Should a live connection be established for the project so that data update on the display is instantaneous?
+\end{itemize}
+
+\end{document}
